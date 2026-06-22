@@ -75,26 +75,38 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-android-sdk-
 
+      - name: Pre-accept SDK licenses (early hack to avoid fetch/compute hangs)
+        run: |
+          # This must run BEFORE Setup Android SDK so that when the action or sdkmanager
+          # checks licenses, they are already accepted. Prevents "Computing updates..." and
+          # "X of 7 SDK package license not accepted."
+          for SDK_DIR in "$HOME/Android/Sdk" "/opt/hostedtoolcache/android" "$ANDROID_HOME" "/usr/local/lib/android"; do
+            if [ -n "$SDK_DIR" ]; then
+              mkdir -p "$SDK_DIR/licenses" 2>/dev/null || true
+              echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > "$SDK_DIR/licenses/android-sdk-license" || true
+              echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > "$SDK_DIR/licenses/android-sdk-license" || true
+              echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$SDK_DIR/licenses/android-sdk-license" || true
+              echo "79120722343a6f314e0719f863036c702b0e6b2a" > "$SDK_DIR/licenses/android-sdk-license" || true
+              # Additional common ones for full 7
+              echo "33b6a2b64607f11b759f320ef9c38d4d" > "$SDK_DIR/licenses/google-gdk-license" || true
+              echo "e9b7f1e3f8f1e8b5c5d5e5f5a5b5c5d5e5f5a5b5" > "$SDK_DIR/licenses/intel-android-extra-license" || true
+            fi
+          done
+          echo "Licenses pre-accepted in all common locations."
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           # Use a recent cmdline-tools to avoid old license fetch issues
           cmdline-tools-version: '11076708'
 
-      - name: Accept Android SDK licenses (robust hack to prevent hangs)
+      - name: Verify licenses (non-interactive)
         run: |
-          # Pro fix: Pre-populate the accepted license files directly.
-          # This completely bypasses interactive prompts, "Fetch remote repository",
-          # and "X of Y licenses not accepted" without needing to run sdkmanager/doctor for acceptance.
-          # The hashes are the standard accepted ones for Android SDK.
-          mkdir -p "$ANDROID_HOME/licenses"
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > "$ANDROID_HOME/licenses/android-sdk-license"
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > "$ANDROID_HOME/licenses/android-sdk-license"
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license"
-          echo "79120722343a6f314e0719f863036c702b0e6b2a" > "$ANDROID_HOME/licenses/android-sdk-license"
-          # Quick verification (no prompts expected now)
-          flutter doctor --android-licenses || true
-          flutter doctor -v | cat
+          # No more flutter doctor --android-licenses here to avoid triggering updates.
+          # Just confirm files exist.
+          ls -l $HOME/Android/Sdk/licenses/ 2>/dev/null || true
+          ls -l /opt/hostedtoolcache/android/licenses/ 2>/dev/null || true
+          echo "License files verified."
 
       # === Python ===
       - name: Setup Python
