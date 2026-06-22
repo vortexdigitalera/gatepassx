@@ -1,0 +1,144 @@
+# GatePassX — AHUON Gate Pass Management System
+
+**Digital Gate Pass System for the Association for Hajj and Umrah Operators of Nigeria (AHUON)**
+
+GatePassX enables secure, efficient issuance, validation, and tracking of gate passes for pilgrims, staff, operators, visitors, and vehicles during Hajj and Umrah operations.
+
+## Project Goals
+- Streamline pilgrim and personnel movement at assembly points, departure gates, airports, and camps.
+- Provide tamper-evident digital passes with QR codes.
+- Support both batch high-quality PDF generation (for printing) and on-the-ground mobile operations.
+- Work reliably in low-connectivity environments common in operations.
+
+## Components
+
+### 1. Python Generator (`python-generator/`)
+A standalone Python library + CLI for:
+- Generating professional printable gate passes as PDFs (single or batch).
+- Embedding cryptographically verifiable QR codes.
+- Importing pilgrim/operator data from CSV/JSON/Excel.
+- Validation, signing, and reporting.
+- Useful for headquarters / back-office staff to prepare large volumes of passes.
+
+**Tech**: Python 3.10+, Pillow, qrcode, reportlab/fpdf2, Pydantic, Click.
+
+### 2. Flutter Mobile App (`mobile/`)
+Cross-platform mobile application for field teams and security:
+- Issue passes on the spot (form entry → instant QR).
+- Scan & validate gate passes (camera scanner + offline validation).
+- View, search, and manage active/invalidated passes.
+- Log entries/exits with timestamps and notes.
+- Local-first storage (works offline) with optional sync/export.
+- Role-aware UI (Security, Operator/Issuer, Admin).
+
+**Tech**: Flutter 3+, Dart, sqflite/hive for storage, qr_code_scanner / mobile_scanner, pdf generation, share_plus, etc.
+
+## Key Features (MVP Scope)
+- Pass data model tailored for AHUON operations (Hajj/Umrah, operator affiliation, passport/NIN, group/flight info, gate assignment).
+- Unique pass ID + HMAC or simple signature for verification.
+- QR payload includes pass metadata + integrity hash.
+- Entry/exit audit log.
+- Batch PDF printing support (A4 sheets or individual cards).
+- Sample data for testing.
+- Export/Import passes as JSON bundles (shared between generator and app).
+
+## Directory Structure
+```
+gatepassx/
+├── README.md
+├── python-generator/
+│   ├── gatepass_generator/
+│   │   ├── __init__.py
+│   │   ├── models.py
+│   │   ├── generator.py      # PDF + QR generation
+│   │   ├── cli.py
+│   │   └── utils.py
+│   ├── sample_data/
+│   ├── tests/
+│   └── requirements.txt
+├── mobile/                   # Flutter app
+│   ├── lib/
+│   │   ├── main.dart
+│   │   ├── models/
+│   │   ├── screens/
+│   │   ├── services/
+│   │   └── widgets/
+│   └── ...
+├── shared/
+│   └── sample_passes.json
+├── docs/
+└── .gitignore
+```
+
+## Getting Started
+
+### Prerequisites
+- Python 3.12+
+- Flutter SDK (3.22+)
+- For mobile development: Android Studio / Xcode (for full builds)
+
+### Python Generator
+```bash
+cd python-generator
+python -m venv .venv
+source .venv/bin/activate   # or .venv\Scripts\activate on Windows
+pip install -r requirements.txt
+python -m gatepass_generator.cli --help
+```
+
+Example:
+```bash
+python -m gatepass_generator.cli generate --input sample_data/pilgrims.csv --out passes/
+```
+
+### Flutter App
+```bash
+cd mobile
+flutter pub get
+flutter run   # choose device or web (flutter run -d chrome)
+```
+
+## Data Model Highlights (Pass)
+- `pass_id`: string (unique, e.g. AHUON-HAJJ-2026-000123)
+- `category`: PILGRIM | STAFF | VEHICLE | VISITOR | VIP
+- `full_name`
+- `id_number` (Passport / NIN / License)
+- `phone`
+- `operator`: AHUON member tour operator name
+- `trip_type`: HAJJ | UMRAH
+- `valid_from`, `valid_to`
+- `gate` / `checkpoint`
+- `group_ref` or `flight_ref`
+- `issued_at`, `issued_by`
+- `qr_payload`: the encoded verifiable data
+- Optional: photo reference, vehicle_plate
+
+## Verification Flow
+1. Pass issued (Python batch or Flutter on-device).
+2. QR contains JSON + integrity signature.
+3. Scanner decodes, recomputes hash, checks validity dates, optionally checks against local allow-list.
+4. Log entry action (offline queue).
+
+## Current Status (resumed build)
+✅ Python generator (models, PDF+QR via reportlab, CLI, batch + JSON/CSV import)
+✅ Flutter app (Issue form, QR display with qr_flutter, list, import/export JSON, simulated + mobile scanner entry, local persistence, dashboard, logs)
+✅ Compatible data interchange between Python and Flutter via JSON/QR payload
+✅ Sample data + generated example PDFs
+
+## Next Steps / Roadmap (from previous chat)
+- Core models + Python PDF generator [done]
+- Flutter project scaffold + basic navigation [done]
+- Pass issuance form + QR display [done]
+- Scanner + validation logic [basic + demo]
+- Persistence + sample data + import/export [done]
+- Polish, theming with AHUON branding (green/white), reports, real PDF export in app, better offline sync, auth
+
+## Contributing
+This project is developed for AHUON operational needs. Follow standard PR flow.
+
+## License
+Internal / TBD for AHUON use.
+
+---
+
+Built with ❤️ for seamless Hajj & Umrah experiences across Nigeria.
