@@ -7,27 +7,53 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v1.0.0)'
-        required: false
+        description: 'Version for the release (e.g. v1.0.0). Required for manual runs.'
+        required: true
         default: ''
 
 env:
   FLUTTER_VERSION: '3.22.2'
-  # Force caches and builds into fast temp storage (GitHub runners have fast /tmp)
-  GRADLE_USER_HOME: /tmp/.gradle
-  PUB_CACHE: /tmp/.pub-cache
-  FLUTTER_BUILD_DIR: /tmp/gatepassx-builds/flutter
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed to create releases
+      contents: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      # === Determine version very early ===
+      - name: Determine version
+        id: version
+        run: |
+          set -e
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -z "${{ github.event.inputs.version }}" ]; then
+              echo "::error::Version input is required for manual dispatch"
+              exit 1
+            fi
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          # Strip leading v if present for build name
+          CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "clean_version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION (clean: $CLEAN_VERSION)"
+
+      # === Setup Java (required for Android builds) ===
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # === Flutter ===
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -35,101 +61,108 @@ jobs:
           channel: 'stable'
           cache: true
 
+      # === Python ===
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Prepare temp cache dirs
+      # === Temp cache directories (important for disk) ===
+      - name: Prepare build caches in /tmp
         run: |
-          mkdir -p "$GRADLE_USER_HOME" "$PUB_CACHE" "$FLUTTER_BUILD_DIR"
-          echo "Using temp locations for caches and builds:"
+          export GRADLE_USER_HOME=/tmp/.gradle
+          export PUB_CACHE=/tmp/.pub-cache
+
+          mkdir -p "$GRADLE_USER_HOME" "$PUB_CACHE"
+          echo "Gradle cache: $GRADLE_USER_HOME"
+          echo "Pub cache:    $PUB_CACHE"
           df -h /tmp
 
-      # ==================== FLUTTER APK ====================
+      # ==================== FLUTTER ANDROID ====================
       - name: Get Flutter dependencies
         working-directory: mobile
         run: flutter pub get
 
       - name: Build Android APK (release)
         working-directory: mobile
+        env:
+          GRADLE_USER_HOME: /tmp/.gradle
+          PUB_CACHE: /tmp/.pub-cache
         run: |
+          set -e
+          VERSION_NAME="${{ steps.version.outputs.clean_version }}"
+          BUILD_NUMBER="${{ github.run_number }}"
+
+          echo "Building APK with versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
+
           flutter build apk --release \
-            --build-dir "$FLUTTER_BUILD_DIR" \
-            --build-name "$(echo ${{ github.ref_name }} | sed 's/^v//')" \
-            --build-number ${{ github.run_number }}
+            --build-name "$VERSION_NAME" \
+            --build-number "$BUILD_NUMBER"
 
-      - name: Determine version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="${{ github.ref_name }}"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Using version: $VERSION"
+          # Verify the artifact was produced (standard location)
+          ls -lh "build/app/outputs/flutter-apk/app-release.apk" || {
+            echo "::error::APK not found at expected location"
+            ls -R build/app/outputs/flutter-apk || true
+            exit 1
+          }
 
-      - name: Rename and prepare APK artifact
+      - name: Prepare APK artifact
+        working-directory: mobile
         run: |
+          set -e
           VERSION="${{ steps.version.outputs.version }}"
-          # When using --build-dir, outputs land under the custom build dir
-          APK_SRC="${FLUTTER_BUILD_DIR}/app/outputs/flutter-apk/app-release.apk"
-          APK_DEST="gatepassx-android-${VERSION}.apk"
+          APK_SRC="build/app/outputs/flutter-apk/app-release.apk"
+          APK_DEST="../gatepassx-android-${VERSION}.apk"
+
           cp "$APK_SRC" "$APK_DEST"
           ls -lh "$APK_DEST"
+          echo "artifact_apk=$APK_DEST" >> $GITHUB_ENV
 
       # ==================== PYTHON GENERATOR ====================
-      - name: Install Python build tools
-        run: pip install --upgrade pip wheel
-
       - name: Package Python Generator
         run: |
+          set -e
           VERSION="${{ steps.version.outputs.version }}"
           PKG_DIR="gatepassx-python-generator-${VERSION}"
           mkdir -p "$PKG_DIR"
 
-          # Copy the generator code
+          # Copy the generator source
           cp -r python-generator/* "$PKG_DIR"/
           cp -r sample_data "$PKG_DIR"/ 2>/dev/null || true
 
-          # Add a small launcher README
-          cat > "$PKG_DIR"/README.txt << 'EOF'
-GatePassX Python Generator (AHUON)
-
-This is a standalone packaging of the gate pass PDF + QR generator.
-
-Requirements:
-  pip install -r requirements.txt
-
-Usage:
-  python -m gatepass_generator generate -i sample_data/pilgrims.csv -o passes/ --sheet
-
-Or run the interactive tool:
-  python -m gatepass_generator new-pass
-EOF
+          # Use the dedicated release readme (avoids heredoc issues in YAML)
+          if [ -f python-generator/RELEASE_README.txt ]; then
+            cp python-generator/RELEASE_README.txt "$PKG_DIR/README.txt"
+          fi
 
           # Create zip
           ZIP_NAME="gatepassx-python-generator-${VERSION}.zip"
           zip -r "$ZIP_NAME" "$PKG_DIR"
           ls -lh "$ZIP_NAME"
 
-      # ==================== CREATE RELEASE ====================
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: GatePassX ${{ steps.version.outputs.version }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          files: |
-            gatepassx-android-*.apk
-            gatepassx-python-generator-*.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "artifact_python_zip=$ZIP_NAME" >> $GITHUB_ENV
 
-      - name: Upload build artifacts (for debugging)
+      # ==================== RELEASE ====================
+      - name: Create and upload GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          VERSION="${{ steps.version.outputs.version }}"
+
+          echo "Creating release for $VERSION"
+
+          # Use gh CLI - more reliable than the action for mixed tag/dispatch
+          gh release create "$VERSION" \
+            --title "GatePassX $VERSION" \
+            --generate-notes \
+            --draft=false \
+            gatepassx-android-*.apk \
+            gatepassx-python-generator-*.zip
+
+          echo "Release created and artifacts attached successfully."
+
+      - name: Upload build artifacts (debug)
         uses: actions/upload-artifact@v4
         with:
           name: gatepassx-builds-${{ steps.version.outputs.version }}

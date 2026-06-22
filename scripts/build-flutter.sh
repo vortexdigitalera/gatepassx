@@ -17,32 +17,33 @@ export PUB_CACHE="${PUB_CACHE:-/tmp/.pub-cache}"
 BUILD_ROOT="${GATEPASSX_FLUTTER_BUILD_DIR:-/tmp/gatepassx-builds/flutter}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)/mobile"
 
-mkdir -p "$BUILD_ROOT" "$GRADLE_USER_HOME" "$PUB_CACHE"
+mkdir -p "$GRADLE_USER_HOME" "$PUB_CACHE"
 
 cd "$PROJECT_DIR"
 
 echo "==> Flutter project: $PROJECT_DIR"
-echo "==> Build dir     : $BUILD_ROOT"
 echo "==> Gradle cache  : $GRADLE_USER_HOME"
 echo "==> Pub cache     : $PUB_CACHE"
 echo "==> Disk (tmp)    :"
 df -h /tmp | tail -1
+echo "==> Note: flutter build outputs go to standard build/ (caches redirected to /tmp)"
 
 case "${1:-help}" in
   clean)
-    echo "==> flutter clean (also removing build dir + temp caches)"
+    echo "==> flutter clean (also removing temp caches)"
     flutter clean
-    rm -rf "$BUILD_ROOT" "$GRADLE_USER_HOME" "$PUB_CACHE" 2>/dev/null || true
+    rm -rf "$GRADLE_USER_HOME" "$PUB_CACHE" 2>/dev/null || true
     ;;
   build)
     shift
-    echo "==> flutter build $* --build-dir $BUILD_ROOT (caches in /tmp)"
-    flutter build "$@" --build-dir "$BUILD_ROOT"
+    echo "==> flutter build $* (Gradle/Pub caches in /tmp)"
+    flutter build "$@"
     ;;
   run)
     shift
-    echo "==> flutter run --build-dir $BUILD_ROOT (caches in /tmp) $*"
-    flutter run --build-dir "$BUILD_ROOT" "$@"
+    echo "==> flutter run (caches in /tmp) $*"
+    # --build-dir is valid for run
+    flutter run --build-dir "/tmp/gatepassx-builds/flutter-run" "$@"
     ;;
   analyze|test|pub)
     # These don't produce heavy build artifacts
@@ -51,9 +52,9 @@ case "${1:-help}" in
   *)
     echo "Usage: $0 {clean|build <target>|run [args]|analyze|test|pub get}"
     echo ""
-    echo "All heavy caches (Gradle, Pub, build) are forced to /tmp by default."
-    echo "Override with:"
-    echo "  GATEPASSX_FLUTTER_BUILD_DIR=... GRADLE_USER_HOME=... ./scripts/build-flutter.sh ..."
+    echo "Heavy caches (Gradle + Pub) are forced to /tmp."
+    echo "flutter build outputs use the standard 'build/' directory inside the project."
+    echo "Override caches with: GRADLE_USER_HOME=... PUB_CACHE=... "
     exit 1
     ;;
 esac
