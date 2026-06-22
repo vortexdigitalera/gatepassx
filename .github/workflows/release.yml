@@ -77,22 +77,19 @@ jobs:
 
       - name: Pre-accept SDK licenses (early hack to avoid fetch/compute hangs)
         run: |
-          # This must run BEFORE Setup Android SDK so that when the action or sdkmanager
-          # checks licenses, they are already accepted. Prevents "Computing updates..." and
-          # "X of 7 SDK package license not accepted."
-          for SDK_DIR in "$HOME/Android/Sdk" "/opt/hostedtoolcache/android" "$ANDROID_HOME" "/usr/local/lib/android"; do
-            if [ -n "$SDK_DIR" ]; then
-              mkdir -p "$SDK_DIR/licenses" 2>/dev/null || true
-              echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > "$SDK_DIR/licenses/android-sdk-license" || true
-              echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > "$SDK_DIR/licenses/android-sdk-license" || true
-              echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$SDK_DIR/licenses/android-sdk-license" || true
-              echo "79120722343a6f314e0719f863036c702b0e6b2a" > "$SDK_DIR/licenses/android-sdk-license" || true
-              # Additional common ones for full 7
-              echo "33b6a2b64607f11b759f320ef9c38d4d" > "$SDK_DIR/licenses/google-gdk-license" || true
-              echo "e9b7f1e3f8f1e8b5c5d5e5f5a5b5c5d5e5f5a5b5" > "$SDK_DIR/licenses/intel-android-extra-license" || true
-            fi
+          # Pre-write to user-writable locations before the action installs.
+          # This helps the action's internal sdkmanager not complain.
+          for SDK_DIR in "$HOME/Android/Sdk" "$HOME/.android"; do
+            mkdir -p "$SDK_DIR/licenses" 2>/dev/null || true
+            echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > "$SDK_DIR/licenses/android-sdk-license" || true
+            echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > "$SDK_DIR/licenses/android-sdk-license" || true
+            echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$SDK_DIR/licenses/android-sdk-license" || true
+            echo "79120722343a6f314e0719f863036c702b0e6b2a" > "$SDK_DIR/licenses/android-sdk-license" || true
+            echo "33b6a2b64607f11b759f320ef9c38d4d" > "$SDK_DIR/licenses/google-gdk-license" || true
+            echo "d975f751698a77b662f1254ddbeed3901e976f5a" > "$SDK_DIR/licenses/intel-android-extra-license" || true
+            echo "84831b9409646a918e30573bab4c9c91346d8abd" > "$SDK_DIR/licenses/android-sdk-preview-license" || true
           done
-          echo "Licenses pre-accepted in all common locations."
+          echo "Licenses pre-accepted in writable locations."
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
