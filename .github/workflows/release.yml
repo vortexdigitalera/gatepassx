@@ -59,9 +59,20 @@ jobs:
             --build-name "$(echo ${{ github.ref_name }} | sed 's/^v//')" \
             --build-number ${{ github.run_number }}
 
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
       - name: Rename and prepare APK artifact
         run: |
-          VERSION="${{ github.ref_name }}"
+          VERSION="${{ steps.version.outputs.version }}"
           # When using --build-dir, outputs land under the custom build dir
           APK_SRC="${FLUTTER_BUILD_DIR}/app/outputs/flutter-apk/app-release.apk"
           APK_DEST="gatepassx-android-${VERSION}.apk"
@@ -74,7 +85,7 @@ jobs:
 
       - name: Package Python Generator
         run: |
-          VERSION="${{ github.ref_name }}"
+          VERSION="${{ steps.version.outputs.version }}"
           PKG_DIR="gatepassx-python-generator-${VERSION}"
           mkdir -p "$PKG_DIR"
 
@@ -108,7 +119,7 @@ EOF
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: GatePassX ${{ github.ref_name }}
+          name: GatePassX ${{ steps.version.outputs.version }}
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -121,7 +132,7 @@ EOF
       - name: Upload build artifacts (for debugging)
         uses: actions/upload-artifact@v4
         with:
-          name: gatepassx-builds-${{ github.ref_name }}
+          name: gatepassx-builds-${{ steps.version.outputs.version }}
           path: |
             gatepassx-*.apk
             gatepassx-*.zip
