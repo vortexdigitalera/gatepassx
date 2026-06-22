@@ -1,3 +1,13 @@
+// Provide 'flutter' extension early so that plugins (share_plus, mobile_scanner etc.)
+// can access flutter.compileSdkVersion etc. during their evaluation.
+// This fixes "unknown property 'flutter'" and "compileSdkVersion not specified" errors.
+ext.flutter = [
+    compileSdkVersion: 36,
+    minSdkVersion: 21,
+    targetSdkVersion: 36,
+    ndkVersion: "25.1.8937393"
+]
+
 allprojects {
     repositories {
         google()
