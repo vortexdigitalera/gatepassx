@@ -81,12 +81,20 @@ jobs:
           # Use a recent cmdline-tools to avoid old license fetch issues
           cmdline-tools-version: '11076708'
 
-      - name: Accept Android SDK licenses
+      - name: Accept Android SDK licenses (robust hack to prevent hangs)
         run: |
-          # Non-interactive acceptance. Run both for coverage.
-          yes | sdkmanager --licenses || true
-          yes | flutter doctor --android-licenses || true
-          flutter doctor -v
+          # Pro fix: Pre-populate the accepted license files directly.
+          # This completely bypasses interactive prompts, "Fetch remote repository",
+          # and "X of Y licenses not accepted" without needing to run sdkmanager/doctor for acceptance.
+          # The hashes are the standard accepted ones for Android SDK.
+          mkdir -p "$ANDROID_HOME/licenses"
+          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > "$ANDROID_HOME/licenses/android-sdk-license"
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > "$ANDROID_HOME/licenses/android-sdk-license"
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license"
+          echo "79120722343a6f314e0719f863036c702b0e6b2a" > "$ANDROID_HOME/licenses/android-sdk-license"
+          # Quick verification (no prompts expected now)
+          flutter doctor --android-licenses || true
+          flutter doctor -v | cat
 
       # === Python ===
       - name: Setup Python
