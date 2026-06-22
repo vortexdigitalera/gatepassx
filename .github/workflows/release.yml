@@ -61,22 +61,31 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # Robust non-interactive Android license acceptance + caching to avoid hangs and repeated fetches
+      # Use dedicated Android setup action + explicit caching.
+      # This is more reliable for license acceptance and avoids the "Fetch remote repository" hangs
+      # that happen when flutter doctor tries to auto-update SDK.
       - name: Cache Android SDK
         uses: actions/cache@v4
         with:
           path: |
             ~/.android
+            /opt/hostedtoolcache/android
             /usr/local/lib/android
-            ${{ env.ANDROID_HOME }}
-          key: ${{ runner.os }}-android-${{ hashFiles('mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-android-sdk-${{ hashFiles('mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
-            ${{ runner.os }}-android-
+            ${{ runner.os }}-android-sdk-
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # Use a recent cmdline-tools to avoid old license fetch issues
+          cmdline-tools-version: '11076708'
 
       - name: Accept Android SDK licenses
         run: |
-          echo "y" | flutter doctor --android-licenses || true
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          # Non-interactive acceptance. Run both for coverage.
+          yes | sdkmanager --licenses || true
+          yes | flutter doctor --android-licenses || true
           flutter doctor -v
 
       # === Python ===
