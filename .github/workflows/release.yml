@@ -61,9 +61,23 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Accept Android licenses
+      # Robust non-interactive Android license acceptance + caching to avoid hangs and repeated fetches
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android
+            /usr/local/lib/android
+            ${{ env.ANDROID_HOME }}
+          key: ${{ runner.os }}-android-${{ hashFiles('mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-android-
+
+      - name: Accept Android SDK licenses
         run: |
-          flutter doctor --android-licenses || true
+          echo "y" | flutter doctor --android-licenses || true
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          flutter doctor -v
 
       # === Python ===
       - name: Setup Python
