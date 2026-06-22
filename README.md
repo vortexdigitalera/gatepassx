@@ -113,6 +113,8 @@ You can override locations:
 ```bash
 export GATEPASSX_FLUTTER_BUILD_DIR=/some/other/fast/volume
 export GATEPASSX_PYTHON_VENV=/tmp/my-venv
+export GRADLE_USER_HOME=/tmp/.gradle
+export PUB_CACHE=/tmp/.pub-cache
 ```
 
 Manual equivalent (Flutter):
@@ -120,6 +122,24 @@ Manual equivalent (Flutter):
 cd mobile
 flutter build web --build-dir /tmp/gatepassx-builds/flutter-web
 ```
+
+### Releasing (GitHub Actions)
+
+Push a version tag to automatically build and publish:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Or go to **Actions → "Build and Release" → Run workflow** (manual).
+
+The workflow will produce and attach to the GitHub Release:
+
+- `gatepassx-android-vX.Y.Z.apk` — Flutter Android release build (all caches built in /tmp on the runner)
+- `gatepassx-python-generator-vX.Y.Z.zip` — Self-contained Python generator tool (with requirements + samples)
+
+See [.github/workflows/release.yml](.github/workflows/release.yml) for details. All CI builds also force Gradle + Pub + Flutter build outputs into temp storage.
 
 ### Python Generator
 ```bash
