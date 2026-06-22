@@ -144,6 +144,8 @@ jobs:
         env:
           GRADLE_USER_HOME: /tmp/.gradle
           PUB_CACHE: /tmp/.pub-cache
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
           set -e
           VERSION_NAME="${{ steps.version.outputs.clean_version }}"
