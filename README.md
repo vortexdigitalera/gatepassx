@@ -46,6 +46,9 @@ Cross-platform mobile application for field teams and security:
 ```
 gatepassx/
 ├── README.md
+├── scripts/
+│   ├── build-flutter.sh       # Always builds to /tmp/gatepassx-builds
+│   └── setup-python-venv.sh   # Creates venv under /tmp
 ├── python-generator/
 │   ├── gatepass_generator/
 │   │   ├── __init__.py
@@ -56,7 +59,7 @@ gatepassx/
 │   ├── sample_data/
 │   ├── tests/
 │   └── requirements.txt
-├── mobile/                   # Flutter app
+├── mobile/                   # Flutter app (source only)
 │   ├── lib/
 │   │   ├── main.dart
 │   │   ├── models/
@@ -64,10 +67,13 @@ gatepassx/
 │   │   ├── services/
 │   │   └── widgets/
 │   └── ...
+├── sample_data/
 ├── shared/
-│   └── sample_passes.json
 ├── docs/
 └── .gitignore
+```
+
+**Note:** Build outputs intentionally live under `/tmp/gatepassx-builds` (see Disk section).
 ```
 
 ## Getting Started
@@ -77,25 +83,62 @@ gatepassx/
 - Flutter SDK (3.22+)
 - For mobile development: Android Studio / Xcode (for full builds)
 
-### Python Generator
+### ⚠️ Disk Space & Build Location Strategy
+
+**Important on this codespace / limited environments:**
+
+- **Source** lives in `/workspaces/gatepassx` (small, git-tracked).
+- **Build artifacts** (especially Flutter Gradle, caches, APKs, web builds) should **never** go into the main workspace.
+- **Best location**: `/tmp/gatepassx-builds` — separate 118 GB volume with ~109 GB free.
+- The main volumes are much tighter (one is already ~79% used).
+
+We provide helper scripts that automatically target the high-capacity location.
+
+**Recommended setup commands:**
+
 ```bash
-cd python-generator
-python -m venv .venv
-source .venv/bin/activate   # or .venv\Scripts\activate on Windows
-pip install -r requirements.txt
-python -m gatepass_generator.cli --help
+# Python (recommended - venv in /tmp)
+./scripts/setup-python-venv.sh
+# Then activate:
+source /tmp/gatepassx-builds/python/venv/bin/activate
+
+# Flutter builds/runs (always use the helper or --build-dir)
+./scripts/build-flutter.sh pub get
+./scripts/build-flutter.sh build web          # or apk, aab, etc.
+./scripts/build-flutter.sh run -d chrome
+./scripts/build-flutter.sh clean
 ```
 
-Example:
+You can override locations:
 ```bash
-python -m gatepass_generator.cli generate --input sample_data/pilgrims.csv --out passes/
+export GATEPASSX_FLUTTER_BUILD_DIR=/some/other/fast/volume
+export GATEPASSX_PYTHON_VENV=/tmp/my-venv
+```
+
+Manual equivalent (Flutter):
+```bash
+cd mobile
+flutter build web --build-dir /tmp/gatepassx-builds/flutter-web
+```
+
+### Python Generator
+```bash
+# After activating the /tmp venv (see above)
+cd python-generator
+python -m gatepass_generator --help
+
+# Example generation
+python -m gatepass_generator generate -i ../sample_data/pilgrims.csv -o /tmp/passes --sheet
 ```
 
 ### Flutter App
+Use the helper script above for best results.
+
+Direct (when you want full control):
 ```bash
 cd mobile
 flutter pub get
-flutter run   # choose device or web (flutter run -d chrome)
+flutter run --build-dir /tmp/gatepassx-builds/flutter-run
 ```
 
 ## Data Model Highlights (Pass)
