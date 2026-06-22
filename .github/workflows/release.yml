@@ -100,13 +100,14 @@ jobs:
           # Use a recent cmdline-tools to avoid old license fetch issues
           cmdline-tools-version: '11076708'
 
-      - name: Verify licenses (non-interactive)
+      - name: Accept Android SDK licenses
         run: |
-          # No more flutter doctor --android-licenses here to avoid triggering updates.
-          # Just confirm files exist.
-          ls -l $HOME/Android/Sdk/licenses/ 2>/dev/null || true
-          ls -l /opt/hostedtoolcache/android/licenses/ 2>/dev/null || true
-          echo "License files verified."
+          # Accept after setup so $ANDROID_HOME is set by the action.
+          # The pre-accept earlier should have satisfied any early checks.
+          # Use yes | to handle the prompts non-interactively.
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          yes | flutter doctor --android-licenses || true
+          flutter doctor -v | cat
 
       # === Python ===
       - name: Setup Python
