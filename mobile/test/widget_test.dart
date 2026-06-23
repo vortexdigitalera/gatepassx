@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gatepassx/main.dart';
 import 'package:gatepassx/models/gate_pass.dart';
@@ -7,8 +8,11 @@ import 'package:gatepassx/services/config.dart';
 
 void main() {
   testWidgets('GatePassX app smoke test', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const GatePassXApp(initialTheme: ThemeMode.system));
-    await tester.pumpAndSettle();
+    // Let async _loadData complete (CircularProgressIndicator → content)
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.textContaining('DePass'), findsWidgets);
   });
 
