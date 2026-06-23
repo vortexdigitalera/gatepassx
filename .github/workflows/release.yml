@@ -141,11 +141,11 @@ jobs:
           RUNNER_TEMP: ${{ runner.temp }}
         run: |
           export GRADLE_USER_HOME=$RUNNER_TEMP/.gradle
-          export PUB_CACHE=/home/runner/.pub-cache
+          export PUB_CACHE="${HOME}/.pub-cache"
           mkdir -p "$GRADLE_USER_HOME" "$PUB_CACHE"
           echo "Gradle cache: $GRADLE_USER_HOME"
           echo "Pub cache: $PUB_CACHE"
-          df -h /tmp
+          echo "Disk:"; df -h . || true
 
       # Clean Gradle jar cache before build to avoid "Failed to create Jar file"
       - name: Clean Gradle jar cache
@@ -190,27 +190,25 @@ jobs:
         working-directory: mobile
         env:
           GRADLE_USER_HOME: ${{ runner.temp }}/.gradle
-          PUB_CACHE: /home/runner/.pub-cache
-          ANDROID_HOME: /usr/local/lib/android/sdk
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
           VERSION_NAME: ${{ steps.version.outputs.clean_version }}
           BUILD_NUMBER: ${{ github.run_number }}
-          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEYSTORE_PATH || '' }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEYSTORE_PASSWORD || '' }}
-          ANDROID_KEY_ALIAS: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEY_ALIAS || '' }}
-          ANDROID_KEY_PASSWORD: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEY_PASSWORD || '' }}
         run: |
           set -e
           echo "Building APK versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
-          echo "Keystore: ${ANDROID_KEYSTORE_PATH:-<none>}"
+
+          # macOS runner has different SDK path
+          if [ "$(uname)" = "Darwin" ]; then
+            export ANDROID_HOME="${HOME}/Library/Android/sdk"
+            export ANDROID_SDK_ROOT="${HOME}/Library/Android/sdk"
+            export PUB_CACHE="${HOME}/.pub-cache"
+          else
+            export ANDROID_HOME="/usr/local/lib/android/sdk"
+            export ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
+            export PUB_CACHE="${HOME}/.pub-cache"
+          fi
 
           flutter clean
           flutter pub get
-
-          # Targeted clean for bcprov jar corruption
-          export GRADLE_USER_HOME=${{ runner.temp }}/.gradle
-          rm -rf "$GRADLE_USER_HOME/caches/jars-9" 2>/dev/null || true
-          rm -rf "$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle/bcprov-jdk18on/1.79" 2>/dev/null || true
 
           flutter build apk --release \
             --build-name "$VERSION_NAME" \
