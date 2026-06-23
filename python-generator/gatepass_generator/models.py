@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hmac
+import os
+import warnings
 from datetime import datetime, date
 from enum import Enum
 from typing import Optional
@@ -9,6 +12,22 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 import hashlib
 import json
+
+
+_QR_SECRET_ENV_VAR = "AHUON_QR_SECRET"
+_QR_SECRET_DEV_DEFAULT = "ahuon-dev-secret-do-not-use-in-production"
+
+
+def _get_qr_secret() -> str:
+    """Return the QR signing secret from env, or warn and fall back to dev default."""
+    secret = os.environ.get(_QR_SECRET_ENV_VAR)
+    if not secret:
+        warnings.warn(
+            f"{_QR_SECRET_ENV_VAR} not set — using insecure dev default. "
+            f"Set {_QR_SECRET_ENV_VAR} in production."
+        )
+        secret = _QR_SECRET_DEV_DEFAULT
+    return secret
 
 
 class TripType(str, Enum):
@@ -74,9 +93,11 @@ class GatePass(BaseModel):
             base["vp"] = self.vehicle_plate
 
         if secret:
-            # Simple integrity signature (HMAC-like using sha256 of json+secret)
-            payload_str = json.dumps(base, sort_keys=True)
-            sig = hashlib.sha256((payload_str + secret).encode("utf-8")).hexdigest()[:16]
+            sig = hmac.new(
+                secret.encode("utf-8"),
+                json.dumps(base, sort_keys=True).encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()[:16]
             base["sig"] = sig
         return base
 

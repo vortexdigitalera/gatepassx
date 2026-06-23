@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:crypto/crypto.dart' show sha256, Hmac;
 import 'package:intl/intl.dart';
 
 enum PassCategory { PILGRIM, STAFF, VEHICLE, VISITOR, VIP }
@@ -57,9 +58,14 @@ class GatePass {
     return map;
   }
 
-  String computeQrPayload({String secret = 'ahuon-gatepass-secret-2026'}) {
+  String computeQrPayload({String? secret}) {
     final data = toVerificationMap();
-    // For compatibility with Python generator, use compact json
+    if (secret != null && secret.isNotEmpty) {
+      final payloadStr = jsonEncode(data);
+      final hmac = Hmac(sha256, utf8.encode(secret));
+      final sig = hmac.convert(utf8.encode(payloadStr)).toString().substring(0, 16);
+      data['sig'] = sig;
+    }
     qrPayload = jsonEncode(data);
     return qrPayload!;
   }

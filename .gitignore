@@ -26,3 +26,9 @@ mobile/.flutter-plugins-dependencies
 
 # Env
 .env
+
+# Android signing
+mobile/android/key.properties
+*.jks
+*.keystore
+mobile/android/upload-keystore.jks

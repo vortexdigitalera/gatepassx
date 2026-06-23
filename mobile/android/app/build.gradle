@@ -5,6 +5,10 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// GatePassX release signing: use real RELEASE signing key (from env or key.properties) when available.
+// Falls back to debug key only to allow local `flutter build apk --release` without a keystore.
+apply from: rootProject.file('signing.gradle')
+
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
@@ -25,8 +29,6 @@ if (flutterVersionName == null) {
 
 android {
     namespace = "com.rabyte.gpxadmin"
-    // Use *Version suffix for better compatibility with some plugins (share_plus etc.)
-    // Bump for mobile_scanner which requires Android SDK 36+
     compileSdkVersion Math.max(flutter.compileSdkVersion ?: 34, 36)
     ndkVersion = flutter.ndkVersion ?: "25.1.8937393"
 
@@ -40,25 +42,47 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.rabyte.gpxadmin"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         minSdkVersion flutter.minSdkVersion ?: 21
         targetSdkVersion flutter.targetSdkVersion ?: 36
         versionCode = flutterVersionCode.toInteger()
         versionName = "2026.07.22"
     }
 
+    signingConfigs {
+        release {
+            // Fields populated after this block via configureReleaseSigning if credentials exist.
+            // We always declare it so buildTypes.release can reference signingConfigs.release.
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.release
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+// === Apply real RELEASE signing key (or fallback to debug for local builds) ===
+// This runs after android block so we can safely mutate signingConfigs.release.
+def releaseConfig = configureReleaseSigning()
+if (releaseConfig != null) {
+    signingConfigs.release.storeFile = releaseConfig.storeFile
+    signingConfigs.release.storePassword = releaseConfig.storePassword
+    signingConfigs.release.keyAlias = releaseConfig.keyAlias
+    signingConfigs.release.keyPassword = releaseConfig.keyPassword
+    println "GatePassX: RELEASE signing ENABLED (using provided keystore)"
+} else {
+    // Fallback copies debug values so release variant builds without error.
+    // The resulting APK will be debug-signed (acceptable for sideloading tests).
+    // For production releases the CI workflow MUST supply the signing secrets.
+    signingConfigs.release.storeFile = signingConfigs.debug.storeFile
+    signingConfigs.release.storePassword = signingConfigs.debug.storePassword
+    signingConfigs.release.keyAlias = signingConfigs.debug.keyAlias
+    signingConfigs.release.keyPassword = signingConfigs.debug.keyPassword
+    println "GatePassX: RELEASE signing NOT configured — falling back to debug key for this build"
 }

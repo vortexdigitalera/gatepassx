@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import warnings
 from datetime import datetime
 from typing import Optional, List
 
@@ -16,6 +17,20 @@ from reportlab.lib.utils import ImageReader
 from PIL import Image
 
 from .models import GatePass
+
+_QR_SECRET_ENV_VAR = "AHUON_QR_SECRET"
+_QR_SECRET_DEV_DEFAULT = "ahuon-dev-secret-do-not-use-in-production"
+
+
+def _get_qr_secret() -> str:
+    secret = os.environ.get(_QR_SECRET_ENV_VAR)
+    if not secret:
+        warnings.warn(
+            f"{_QR_SECRET_ENV_VAR} not set — using insecure dev default. "
+            f"Set {_QR_SECRET_ENV_VAR} in production."
+        )
+        secret = _QR_SECRET_DEV_DEFAULT
+    return secret
 
 
 # AHUON brand colors (approximate)
@@ -41,13 +56,15 @@ def generate_qr_image(data: str, box_size: int = 6, border: int = 2) -> Image.Im
 def create_pass_pdf(
     gate_pass: GatePass,
     output_path: str,
-    secret: Optional[str] = "ahuon-gatepass-secret-2026",
+    secret: Optional[str] = None,
     include_photo_placeholder: bool = True,
 ) -> str:
     """
     Generate a professional single gate pass PDF.
     Returns the path written.
     """
+    if secret is None:
+        secret = _get_qr_secret()
     if not gate_pass.qr_payload:
         gate_pass.compute_qr_payload(secret=secret)
 
@@ -160,7 +177,7 @@ def create_pass_pdf(
 def generate_batch_pdfs(
     passes: List[GatePass],
     output_dir: str,
-    secret: Optional[str] = "ahuon-gatepass-secret-2026",
+    secret: Optional[str] = None,
 ) -> List[str]:
     """Generate one PDF per pass. Returns list of written paths."""
     os.makedirs(output_dir, exist_ok=True)
@@ -176,7 +193,7 @@ def generate_batch_pdfs(
 def create_passes_sheet(
     passes: List[GatePass],
     output_path: str,
-    secret: Optional[str] = "ahuon-gatepass-secret-2026",
+    secret: Optional[str] = None,
     cols: int = 2,
 ) -> str:
     """Create a multi-pass printable sheet (e.g. 2-up on A4)."""

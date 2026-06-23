@@ -2,6 +2,8 @@
 
 import json
 import csv
+import os
+import warnings
 from datetime import datetime, date
 from pathlib import Path
 from typing import List
@@ -11,6 +13,20 @@ import yaml
 
 from .models import GatePass, PassCategory, TripType
 from .generator import create_pass_pdf, generate_batch_pdfs, create_passes_sheet
+
+_QR_SECRET_ENV_VAR = "AHUON_QR_SECRET"
+_QR_SECRET_DEV_DEFAULT = "ahuon-dev-secret-do-not-use-in-production"
+
+
+def _get_qr_secret() -> str:
+    secret = os.environ.get(_QR_SECRET_ENV_VAR)
+    if not secret:
+        warnings.warn(
+            f"{_QR_SECRET_ENV_VAR} not set — using insecure dev default. "
+            f"Set {_QR_SECRET_ENV_VAR} in production."
+        )
+        secret = _QR_SECRET_DEV_DEFAULT
+    return secret
 
 
 def _load_passes_from_file(path: Path) -> List[GatePass]:
@@ -64,9 +80,11 @@ def cli():
               help="Path to JSON / YAML / CSV containing pass data.")
 @click.option("--out", "-o", "output_dir", default="generated_passes", type=click.Path(path_type=Path),
               help="Output directory for PDFs.")
-@click.option("--secret", default="ahuon-gatepass-secret-2026", help="Secret for QR signing.")
+@click.option("--secret", default=None, help="Secret for QR signing (default: $AHUON_QR_SECRET).")
 @click.option("--sheet", is_flag=True, help="Also produce a summary batch sheet PDF.")
-def generate(input_path: Path, output_dir: Path, secret: str, sheet: bool):
+def generate(input_path: Path, output_dir: Path, secret: str | None, sheet: bool):
+    if secret is None:
+        secret = _get_qr_secret()
     """Generate gate pass PDF(s) from input data file."""
     passes = _load_passes_from_file(input_path)
     click.echo(f"Loaded {len(passes)} pass(es) from {input_path}")
@@ -105,7 +123,7 @@ def new_pass(out: Path):
     data["issued_by"] = click.prompt("Issued by", default="AHUON Ops")
 
     gp = GatePass(**data)
-    gp.compute_qr_payload()
+    gp.compute_qr_payload(secret=_get_qr_secret())
     out.write_text(gp.model_dump_json(indent=2))
     click.echo(f"Wrote {out}")
     click.echo("You can now run: gatepassx generate -i pass.json -o ./out --sheet")
@@ -113,8 +131,10 @@ def new_pass(out: Path):
 
 @cli.command("validate")
 @click.argument("pass_file", type=click.Path(exists=True, path_type=Path))
-@click.option("--secret", default="ahuon-gatepass-secret-2026")
-def validate_cmd(pass_file: Path, secret: str):
+@click.option("--secret", default=None)
+def validate_cmd(pass_file: Path, secret: str | None):
+    if secret is None:
+        secret = _get_qr_secret()
     """Validate / show QR payload for a pass JSON file."""
     data = json.loads(pass_file.read_text())
     gp = GatePass(**data)

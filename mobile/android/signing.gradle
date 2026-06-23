@@ -1,0 +1,55 @@
+// Android release signing configuration for GatePassX (GatePassX uses RELEASE signing key when available).
+//
+// Reads credentials from (in order):
+//   1. Environment variables (ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD,
+//      ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD)  -- preferred for CI
+//   2. key.properties (next to this file; gitignored)
+//
+// Call configureReleaseSigning() AFTER declaring signingConfigs.release
+// It returns a map with storeFile/storePassword/keyAlias/keyPassword when valid, else null.
+//
+// In app/build.gradle after the android {} block:
+//   def cfg = configureReleaseSigning()
+//   if (cfg) { ... apply to signingConfigs.release ... } else { fallback }
+
+ext.configureReleaseSigning = {
+    def keystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
+    def keystorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+    def keyAlias = System.getenv('ANDROID_KEY_ALIAS')
+    def keyPassword = System.getenv('ANDROID_KEY_PASSWORD')
+
+    if (keystorePath) {
+        println "signing.gradle: using ANDROID_* env vars for RELEASE signing (keystore: $keystorePath)"
+    } else {
+        // key.properties is resolved relative to the android project root
+        def propsFile = rootProject.file('key.properties')
+        if (propsFile.exists()) {
+            def props = new Properties()
+            props.load(new FileInputStream(propsFile))
+            keystorePath = props.getProperty('storeFile')
+            keystorePassword = props.getProperty('storePassword')
+            keyAlias = props.getProperty('keyAlias')
+            keyPassword = props.getProperty('keyPassword')
+            if (keystorePath) {
+                println "signing.gradle: using key.properties for RELEASE signing (keystore: $keystorePath)"
+            }
+        }
+    }
+
+    if (keystorePath && keystorePassword && keyAlias && keyPassword) {
+        def storeFile = file(keystorePath)
+        if (storeFile.exists()) {
+            return [
+                storeFile: storeFile,
+                storePassword: keystorePassword,
+                keyAlias: keyAlias,
+                keyPassword: keyPassword
+            ]
+        } else {
+            println "signing.gradle WARNING: keystore file not found at $keystorePath (will fallback)"
+        }
+    } else {
+        println "signing.gradle: no RELEASE signing credentials (env or key.properties) provided"
+    }
+    return null
+}

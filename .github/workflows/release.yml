@@ -29,17 +29,20 @@ jobs:
       # === Determine version very early ===
       - name: Determine version
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_INPUT_VERSION: ${{ github.event.inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -e
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$EVENT_INPUT_VERSION"
             if [ -z "$VERSION" ]; then
               VERSION="2026.07.22"
             fi
           else
-            VERSION="${{ github.ref_name }}"
+            VERSION="$REF_NAME"
           fi
-          # Strip leading v if present for build name
           CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "clean_version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
@@ -141,44 +144,109 @@ jobs:
           echo "Pub cache: $PUB_CACHE"
           df -h /tmp
 
+      # === RELEASE signing key setup (critical: makes the APK use real release signing, NOT debug) ===
+      - name: Prepare Android RELEASE signing key
+        id: signing
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 || secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS || secrets.ANDROID_KEY_ALIAS || 'upload' }}
+          KEY_PASS: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD || secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -e
+          SIGNING_DIR="${RUNNER_TEMP}/signing"
+          mkdir -p "$SIGNING_DIR"
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$SIGNING_DIR/release-keystore.jks"
+            chmod 600 "$SIGNING_DIR/release-keystore.jks" || true
+            {
+              echo "ANDROID_KEYSTORE_PATH=$SIGNING_DIR/release-keystore.jks"
+              echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASS"
+              echo "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+              echo "ANDROID_KEY_PASSWORD=$KEY_PASS"
+            } >> $GITHUB_ENV
+            echo "keystore_prepared=true" >> $GITHUB_OUTPUT
+            echo "RELEASE signing key prepared (from secrets). Keystore will be used for the APK."
+            ls -l "$SIGNING_DIR/release-keystore.jks"
+          else
+            echo "keystore_prepared=false" >> $GITHUB_OUTPUT
+            echo "::error::Missing release keystore secret (ANDROID_RELEASE_KEYSTORE_BASE64 / ANDROID_KEYSTORE_BASE64)."
+            echo "You must configure the 4 signing secrets in the repo for release builds to use a real RELEASE key."
+            exit 1
+          fi
+
       # ==================== FLUTTER ANDROID ====================
       - name: Get Flutter dependencies
         working-directory: mobile
         run: flutter pub get
 
-      - name: Build Android APK (release)
+      - name: Build Android APK (release, using RELEASE signing key)
         working-directory: mobile
         env:
           GRADLE_USER_HOME: ${{ runner.temp }}/.gradle
           PUB_CACHE: /home/runner/.pub-cache
           ANDROID_HOME: /usr/local/lib/android/sdk
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          VERSION_NAME: ${{ steps.version.outputs.clean_version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          # Signing envs come from previous "Prepare Android RELEASE signing key" step via $GITHUB_ENV
+          ANDROID_KEYSTORE_PATH: ${{ env.ANDROID_KEYSTORE_PATH }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ env.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ env.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ env.ANDROID_KEY_PASSWORD }}
         run: |
           set -e
-          VERSION_NAME="${{ steps.version.outputs.clean_version }}"
-          BUILD_NUMBER="${{ github.run_number }}"
+          echo "Building APK (RELEASE) with versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
+          echo "Using keystore: ${ANDROID_KEYSTORE_PATH:-<none>}"
 
-          echo "Building APK with versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
-
-          # Clean potentially corrupted jars cache (common cause of "Failed to create Jar file" on runners)
           rm -rf $GRADLE_USER_HOME/caches/jars-* || true
 
           flutter build apk --release \
             --build-name "$VERSION_NAME" \
             --build-number "$BUILD_NUMBER"
 
-          # Verify the artifact was produced (standard location)
           ls -lh "build/app/outputs/flutter-apk/app-release.apk" || {
             echo "::error::APK not found at expected location"
             ls -R build/app/outputs/flutter-apk || true
             exit 1
           }
 
-      - name: Prepare APK artifact
+      - name: Verify RELEASE signing (fail if debug key used)
         working-directory: mobile
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
           set -e
-          VERSION="${{ steps.version.outputs.version }}"
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          echo "Verifying signature on $APK"
+          if [ ! -f "$APK" ]; then
+            echo "APK missing"; exit 1
+          fi
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner 2>/dev/null | head -1 || true)
+          if [ -n "$APKSIGNER" ] && [ -x "$APKSIGNER" ]; then
+            echo "=== apksigner verify --print-certs ==="
+            "$APKSIGNER" verify --print-certs "$APK" || true
+            if "$APKSIGNER" verify --print-certs "$APK" 2>&1 | grep -i 'CN=Android Debug' >/dev/null; then
+              echo "::error::APK was signed with DEBUG certificate instead of the RELEASE signing key!"
+              echo "Check that Prepare Android RELEASE signing key step succeeded and secrets are set."
+              exit 1
+            fi
+            echo "APK signature verified: does NOT contain Android Debug cert."
+          else
+            echo "apksigner not located under $ANDROID_HOME/build-tools; skipping deep cert print (signing config was applied via gradle)."
+            # Still do a basic check via jarsigner if available
+            if command -v jarsigner >/dev/null; then
+              jarsigner -verify -certs "$APK" 2>&1 | head -20 || true
+            fi
+          fi
+
+      - name: Prepare APK artifact
+        working-directory: mobile
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -e
           APK_SRC="build/app/outputs/flutter-apk/app-release.apk"
           APK_DEST="../gatepassx-android-${VERSION}.apk"
 
@@ -188,9 +256,10 @@ jobs:
 
       # ==================== PYTHON GENERATOR ====================
       - name: Package Python Generator
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -e
-          VERSION="${{ steps.version.outputs.version }}"
           PKG_DIR="gatepassx-python-generator-${VERSION}"
           mkdir -p "$PKG_DIR"
 
@@ -214,13 +283,11 @@ jobs:
       - name: Create and upload GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -e
-          VERSION="${{ steps.version.outputs.version }}"
-
           echo "Creating release for $VERSION"
 
-          # Use gh CLI - more reliable than the action for mixed tag/dispatch
           gh release create "$VERSION" \
             --title "GatePassX $VERSION" \
             --generate-notes \

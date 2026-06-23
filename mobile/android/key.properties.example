@@ -1,0 +1,27 @@
+# Android RELEASE signing configuration for GatePassX.
+# Copy to key.properties (same dir) and fill real values for local prod-like builds.
+# key.properties and *.jks are gitignored.
+#
+# For CI RELEASE builds (GitHub Actions), DO NOT use this file.
+# Instead configure these 4 secrets in the repo (Settings > Secrets and variables > Actions):
+#   ANDROID_RELEASE_KEYSTORE_BASE64   (or ANDROID_KEYSTORE_BASE64)
+#   ANDROID_RELEASE_KEYSTORE_PASSWORD (or ANDROID_KEYSTORE_PASSWORD)
+#   ANDROID_RELEASE_KEY_ALIAS         (or ANDROID_KEY_ALIAS, default 'upload')
+#   ANDROID_RELEASE_KEY_PASSWORD      (or ANDROID_KEY_PASSWORD)
+#
+# Generate a real release keystore (once, keep the file + passwords safe):
+#   keytool -genkey -v -keystore release-keystore.jks \
+#     -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
+#     -storepass <pass> -keypass <pass> \
+#     -dname "CN=GatePassX, OU=AHUON, O=Rabyte, L=City, S=State, C=NG"
+#
+# Then base64 it for the secret:
+#   base64 -w0 release-keystore.jks > keystore.b64
+#   # paste contents of keystore.b64 as the BASE64 secret value
+#
+# Local key.properties example (relative path ok, file must exist next to it):
+
+storePassword=changeit
+keyPassword=changeit
+keyAlias=upload
+storeFile=release-keystore.jks
