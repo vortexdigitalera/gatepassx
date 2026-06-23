@@ -160,6 +160,9 @@ jobs:
 
           echo "Building APK with versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
 
+          # Clean potentially corrupted jars cache (common cause of "Failed to create Jar file" on runners)
+          rm -rf $GRADLE_USER_HOME/caches/jars-* || true
+
           flutter build apk --release \
             --build-name "$VERSION_NAME" \
             --build-number "$BUILD_NUMBER"
