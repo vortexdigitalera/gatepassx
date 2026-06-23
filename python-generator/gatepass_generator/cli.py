@@ -19,14 +19,20 @@ from .generator import (
     generate_batch_pdfs,
     create_passes_sheet,
     save_qr_image,
+    export_batch_images,
+    export_template_as_image,
+    lock_input_file,
+    check_input_lock,
+    unlock_input_file,
 )
+from .models import PassManifest
 from .utils import verify_qr_payload
 
 __version__ = "1.0.0"
 
 
 def _load_passes_from_file(path: Path) -> List[GatePass]:
-    """Load passes from JSON, YAML, or CSV."""
+    """Load passes from JSON, YAML, CSV, or XLSX."""
     suffix = path.suffix.lower()
 
     if suffix == ".json":
@@ -52,6 +58,21 @@ def _load_passes_from_file(path: Path) -> List[GatePass]:
             for row in reader:
                 passes.append(GatePass(**_coerce_csv_row(row)))
             return passes
+
+    elif suffix == ".xlsx":
+        from openpyxl import load_workbook
+        wb = load_workbook(str(path), read_only=True, data_only=True)
+        ws = wb.active
+        rows_iter = ws.iter_rows(values_only=True)
+        headers = [str(c).strip() if c is not None else "" for c in next(rows_iter)]
+        passes = []
+        for cells in rows_iter:
+            row = {headers[i]: cells[i] for i in range(min(len(headers), len(cells))) if headers[i]}
+            if not any(row.values()):
+                continue
+            passes.append(GatePass(**_coerce_xlsx_row(row)))
+        wb.close()
+        return passes
 
     else:
         raise click.ClickException(f"Unsupported input format: {suffix}")
@@ -86,6 +107,55 @@ def _coerce_csv_row(row: dict) -> dict:
     if "event_type" in row and row["event_type"]:
         row["event_type"] = EventType(row["event_type"].upper())
     # Legacy columns
+    if "operator" in row and "organizer" not in row:
+        row["organizer"] = row.pop("operator", "")
+    if "trip_type" in row and "event_type" not in row:
+        tt = row.pop("trip_type", "")
+        if tt:
+            row["event_type"] = EventType.OTHER
+    return row
+
+
+def _coerce_xlsx_row(row: dict) -> dict:
+    """Normalize an XLSX row into GatePass-compatible types.
+
+    openpyxl returns datetime.datetime for date cells, so handle those
+    before stringifying everything else.
+    """
+    if "valid_from" in row and row["valid_from"]:
+        v = row["valid_from"]
+        if isinstance(v, datetime):
+            row["valid_from"] = v.date()
+        elif isinstance(v, date):
+            pass
+        else:
+            row["valid_from"] = date.fromisoformat(str(v)[:10])
+    if "valid_to" in row and row["valid_to"]:
+        v = row["valid_to"]
+        if isinstance(v, datetime):
+            row["valid_to"] = v.date()
+        elif isinstance(v, date):
+            pass
+        else:
+            row["valid_to"] = date.fromisoformat(str(v)[:10])
+    if "issued_at" in row and row["issued_at"]:
+        v = row["issued_at"]
+        if isinstance(v, datetime):
+            pass
+        else:
+            row["issued_at"] = datetime.fromisoformat(str(v))
+    if "category" in row and row["category"]:
+        row["category"] = PassCategory(str(row["category"]).upper())
+    if "event_type" in row and row["event_type"]:
+        row["event_type"] = EventType(str(row["event_type"]).upper())
+    for key in list(row.keys()):
+        v = row[key]
+        if v is None:
+            row[key] = ""
+        elif isinstance(v, (date, datetime, PassCategory, EventType)):
+            pass
+        elif not isinstance(v, str):
+            row[key] = str(v)
     if "operator" in row and "organizer" not in row:
         row["organizer"] = row.pop("operator", "")
     if "trip_type" in row and "event_type" not in row:
@@ -136,7 +206,7 @@ def cli():
 @cli.command()
 @click.option("-i", "--input", "input_path", required=True,
               type=click.Path(exists=True, path_type=Path),
-              help="JSON / YAML / CSV file containing pass data.")
+              help="JSON / YAML / CSV / XLSX file containing pass data.")
 @click.option("-o", "--out", "output_dir", default="generated_passes",
               type=click.Path(path_type=Path),
               help="Output directory for PDFs (default: generated_passes/).")
@@ -158,10 +228,39 @@ def cli():
 @click.option("--template", "template_path", default=None,
               type=click.Path(exists=True, path_type=Path),
               help="Template PDF to use as background (overlay pass data on template).")
+@click.option("--png", "export_png", is_flag=True,
+              help="Export each pass as a high-resolution PNG image.")
+@click.option("--jpeg", "export_jpeg", is_flag=True,
+              help="Export each pass as a high-resolution JPEG image.")
+@click.option("--dpi", default=300, type=int,
+              help="DPI for PNG/JPEG export (default: 300).")
+@click.option("--jpeg-quality", default=95, type=int,
+              help="JPEG quality 1-100 (default: 95).")
+@click.option("--force", is_flag=True,
+              help="Override lock protection and regenerate even if data was altered.")
+@click.option("--no-lock", is_flag=True,
+              help="Skip creating a lock file after generation.")
 def generate(input_path: Path, output_dir: Path, secret: Optional[str], sheet: bool, qr_only: bool,
              qr_size: float, qr_align: str, qr_border: int, qr_transparent: bool,
-             overlay_texts: tuple, text_sizes: tuple, template_path: Optional[Path]):
-    """Generate gate pass PDFs or QR images from a data file."""
+             overlay_texts: tuple, text_sizes: tuple, template_path: Optional[Path],
+             export_png: bool, export_jpeg: bool, dpi: int, jpeg_quality: int,
+             force: bool, no_lock: bool):
+    """Generate gate pass PDFs, QR images, or high-res PNG/JPEG from a data file.
+
+    After generation the input file is locked (.lock manifest). Any subsequent
+    attempt to generate from an altered file is blocked unless --force is used.
+    """
+    # ── Lock check ──────────────────────────────────────────────────────
+    manifest, intact = check_input_lock(str(input_path))
+    if manifest is not None and not intact:
+        click.echo(f"✗ LOCKED: {input_path} has been altered since last generation.")
+        click.echo(f"  Last generated: {manifest.generated_at.strftime('%Y-%m-%d %H:%M UTC')}")
+        click.echo(f"  Passes: {manifest.pass_count}  →  {manifest.output_dir}")
+        if not force:
+            click.echo(f"  Use --force to override, or 'gatepassx unlock {input_path}' to remove lock.")
+            sys.exit(1)
+        click.echo("  --force: overriding lock protection.")
+
     if secret is None:
         secret = get_qr_secret()
 
@@ -188,10 +287,27 @@ def generate(input_path: Path, output_dir: Path, secret: Optional[str], sheet: b
         created = generate_batch_pdfs(passes, str(output_dir), secret=secret, design=design)
         click.echo(f"✓ Generated {len(created)} PDF(s) in {output_dir}")
 
+    if export_png:
+        png_dir = output_dir / "png"
+        png_paths = export_batch_images(passes, str(png_dir), secret=secret, design=design,
+                                        dpi=dpi, fmt="png")
+        click.echo(f"✓ Exported {len(png_paths)} PNG(s) at {dpi} DPI → {png_dir}")
+
+    if export_jpeg:
+        jpg_dir = output_dir / "jpeg"
+        jpg_paths = export_batch_images(passes, str(jpg_dir), secret=secret, design=design,
+                                        dpi=dpi, fmt="jpeg", jpeg_quality=jpeg_quality)
+        click.echo(f"✓ Exported {len(jpg_paths)} JPEG(s) at {dpi} DPI → {jpg_dir}")
+
     if sheet:
         sheet_path = output_dir / "batch_sheet.pdf"
         create_passes_sheet(passes, str(sheet_path), secret=secret, design=design)
         click.echo(f"✓ Created batch summary sheet: {sheet_path}")
+
+    # ── Auto-lock ───────────────────────────────────────────────────────
+    if not no_lock:
+        m = lock_input_file(str(input_path), str(output_dir), len(passes))
+        click.echo(f"🔒 Locked {input_path.name} ({len(passes)} passes, hash {m.input_hash[:12]}…)")
 
     click.echo("Done.")
 
@@ -354,52 +470,135 @@ def qr(input_path: Path, out: Optional[Path], size: int, secret: Optional[str], 
 @cli.command()
 @click.option("-o", "--out", default="template.json", type=click.Path(path_type=Path),
               help="Output template file.")
-@click.option("--format", "fmt", type=click.Choice(["json", "csv"]), default="json",
+@click.option("--format", "fmt", type=click.Choice(["json", "csv", "xlsx"]), default="json",
               help="Template format.")
 def template(out: Path, fmt: str):
     """Generate a sample data template for bulk import."""
+    headers = [
+        "pass_id", "event_name", "event_type", "category", "full_name",
+        "id_number", "phone", "email", "organizer", "valid_from", "valid_to",
+        "gate", "table_number", "group_ref", "issued_by",
+    ]
+    sample_row = [
+        "GPX-DINNER-2026-000001", "Annual Gala Dinner", "DINNER", "GUEST",
+        "Jane Doe", "REG-001", "+2348012345678", "jane@example.com",
+        "Event Co.", "2026-07-01", "2026-07-01", "Main Entrance",
+        "T-12", "INV-2026-001", "GatePassX CLI",
+    ]
+
     if fmt == "json":
         sample = {
-            "passes": [
-                {
-                    "pass_id": "GPX-DINNER-2026-000001",
-                    "event_name": "Annual Gala Dinner",
-                    "event_type": "DINNER",
-                    "category": "GUEST",
-                    "full_name": "Jane Doe",
-                    "id_number": "REG-001",
-                    "phone": "+2348012345678",
-                    "email": "jane@example.com",
-                    "organizer": "Event Co.",
-                    "valid_from": "2026-07-01",
-                    "valid_to": "2026-07-01",
-                    "gate": "Main Entrance",
-                    "table_number": "T-12",
-                    "group_ref": "INV-2026-001",
-                    "issued_by": "GatePassX CLI",
-                }
-            ]
+            "passes": [dict(zip(headers, sample_row))]
         }
         out.write_text(json.dumps(sample, indent=2))
+    elif fmt == "xlsx":
+        from openpyxl import Workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Passes"
+        ws.append(headers)
+        ws.append(sample_row)
+        wb.save(str(out))
     else:
-        headers = [
-            "pass_id", "event_name", "event_type", "category", "full_name",
-            "id_number", "phone", "email", "organizer", "valid_from", "valid_to",
-            "gate", "table_number", "group_ref", "issued_by",
-        ]
-        row = [
-            "GPX-DINNER-2026-000001", "Annual Gala Dinner", "DINNER", "GUEST",
-            "Jane Doe", "REG-001", "+2348012345678", "jane@example.com",
-            "Event Co.", "2026-07-01", "2026-07-01", "Main Entrance",
-            "T-12", "INV-2026-001", "GatePassX CLI",
-        ]
         with out.open("w", newline="") as f:
             w = csv.writer(f)
             w.writerow(headers)
-            w.writerow(row)
+            w.writerow(sample_row)
 
     click.echo(f"✓ Template written to {out} ({fmt} format)")
     click.echo(f"  Edit the file, then run: gatepassx generate -i {out} -o ./passes")
+
+
+# ── export-template ──────────────────────────────────────────────────────────
+
+@cli.command("export-template")
+@click.option("-t", "--template", "template_path", required=True,
+              type=click.Path(exists=True, path_type=Path),
+              help="Template PDF to render.")
+@click.option("-o", "--out", default=None, type=click.Path(path_type=Path),
+              help="Output image path (default: template.png).")
+@click.option("--format", "fmt", type=click.Choice(["png", "jpeg", "jpg"]), default="png",
+              help="Image format (default: png).")
+@click.option("--dpi", default=300, type=int,
+              help="Render DPI (default: 300). Use 600+ for print-quality.")
+@click.option("--jpeg-quality", default=95, type=int,
+              help="JPEG quality 1-100 (default: 95).")
+def export_template_cmd(template_path: Path, out: Optional[Path], fmt: str,
+                        dpi: int, jpeg_quality: int):
+    """Export a template PDF as a high-resolution PNG or JPEG image."""
+    ext = "jpg" if fmt in ("jpeg", "jpg") else "png"
+    out_path = out or Path(f"{template_path.stem}.{ext}")
+
+    export_template_as_image(
+        str(template_path), str(out_path),
+        dpi=dpi, fmt=fmt, jpeg_quality=jpeg_quality,
+    )
+    click.echo(f"✓ Template exported → {out_path} ({fmt.upper()}, {dpi} DPI)")
+
+
+# ── lock ─────────────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.argument("input_file", type=click.Path(exists=True, path_type=Path))
+@click.option("-o", "--output-dir", default="generated_passes",
+              help="Output directory to record in the lock manifest.")
+def lock(input_file: Path, output_dir: str):
+    """Lock a data file to prevent alterations after passes are printed.
+
+    Creates a .lock manifest with a SHA-256 hash of the file. Subsequent
+    generate commands will refuse if the file has been modified.
+    """
+    manifest, intact = check_input_lock(str(input_file))
+    if manifest is not None and intact:
+        click.echo(f"🔒 Already locked: {input_file}")
+        click.echo(f"  Generated: {manifest.generated_at.strftime('%Y-%m-%d %H:%M UTC')}")
+        click.echo(f"  Passes: {manifest.pass_count}  →  {manifest.output_dir}")
+        return
+
+    passes = _load_passes_from_file(input_file)
+    m = lock_input_file(str(input_file), output_dir, len(passes))
+    click.echo(f"🔒 Locked {input_file.name} ({len(passes)} passes, hash {m.input_hash[:12]}…)")
+
+
+# ── unlock ───────────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.argument("input_file", type=click.Path(path_type=Path))
+def unlock(input_file: Path):
+    """Remove the lock from a data file, allowing regeneration.
+
+    Use this when you intentionally need to modify the data and regenerate.
+    """
+    if unlock_input_file(str(input_file)):
+        click.echo(f"🔓 Unlocked {input_file.name}")
+    else:
+        click.echo(f"  No lock file found for {input_file}")
+
+
+# ── status ───────────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.argument("input_file", type=click.Path(exists=True, path_type=Path))
+def status(input_file: Path):
+    """Check the lock status of a data file."""
+    manifest, intact = check_input_lock(str(input_file))
+    if manifest is None:
+        click.echo(f"  {input_file.name}: unlocked (no lock file)")
+        return
+
+    if intact:
+        click.echo(f"🔒 {input_file.name}: LOCKED — data intact")
+    else:
+        click.echo(f"⚠  {input_file.name}: LOCKED — data ALTERED since generation")
+
+    click.echo(f"  Generated: {manifest.generated_at.strftime('%Y-%m-%d %H:%M UTC')}")
+    click.echo(f"  Passes:    {manifest.pass_count}")
+    click.echo(f"  Output:    {manifest.output_dir}")
+    click.echo(f"  Hash:      {manifest.input_hash[:12]}…")
+    if not intact:
+        current = PassManifest.hash_file(str(input_file))
+        click.echo(f"  Current:   {current[:12]}…  ← MISMATCH")
+        click.echo(f"  Run 'gatepassx unlock {input_file}' to allow regeneration.")
 
 
 # ── info ─────────────────────────────────────────────────────────────────────

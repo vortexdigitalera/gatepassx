@@ -33,3 +33,6 @@ mobile/android/key.properties
 *.keystore
 mobile/android/upload-keystore.jks
 python-generator/outputdir/gatepassx_release.zip
+mobile/.qwen/skills/auto-skill-flutter-svg-launcher-icon/SKILL.md
+mobile/.qwen/skills/auto-skill-flutter-m3-migration/SKILL.md
+mobile/.qwen/settings.json

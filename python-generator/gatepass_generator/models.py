@@ -9,6 +9,7 @@ import os
 import warnings
 from datetime import datetime, date
 from enum import Enum
+from pathlib import Path
 from typing import Optional, List
 
 from pydantic import BaseModel, Field, field_validator
@@ -176,3 +177,41 @@ class PassLogEntry(BaseModel):
     device_id: Optional[str] = None
     notes: Optional[str] = None
     valid: bool = True
+
+
+class PassManifest(BaseModel):
+    """Lock manifest for a generated batch — prevents data alteration after print."""
+
+    input_file: str = Field(..., description="Path to the source data file")
+    input_hash: str = Field(..., description="SHA-256 hex digest of the input file at generation time")
+    output_dir: str = Field(..., description="Output directory where PDFs/images were written")
+    pass_count: int = Field(..., description="Number of passes generated")
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generator_version: str = Field("1.0.0")
+
+    @property
+    def lock_path(self) -> str:
+        """Path to the .lock file alongside the input."""
+        return self.input_file + ".lock"
+
+    def write_lock(self) -> str:
+        """Write the manifest as a .lock JSON file next to the input."""
+        Path(self.lock_path).write_text(self.model_dump_json(indent=2))
+        return self.lock_path
+
+    @classmethod
+    def read_lock(cls, input_file: str) -> Optional["PassManifest"]:
+        """Read an existing .lock file for the given input, or return None."""
+        lock = Path(input_file + ".lock")
+        if not lock.exists():
+            return None
+        return cls.model_validate_json(lock.read_text())
+
+    @staticmethod
+    def hash_file(path: str) -> str:
+        """Return the SHA-256 hex digest of a file."""
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                h.update(chunk)
+        return h.hexdigest()

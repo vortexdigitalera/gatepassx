@@ -7,6 +7,13 @@
     "zone": "KANO ZONE",
     "category": "MEMBER"
   },
+  "operators": {
+    "total": 134,
+    "original": 98,
+    "added_from_update": 36,
+    "source_pdf": "list.pdf",
+    "source_xlsx": "list_update.xlsx"
+  },
   "design": {
     "qr_size_mm": 130,
     "qr_alignment": "center",
@@ -26,5 +33,5 @@
     "metadata_value_size": 16,
     "category_badge_size": 16
   },
-  "cli_command": "python3 -m app generate -i operators_sample.csv -o ./passes --template template.pdf --qr-size 130 --qr-align center --qr-border 0 --qr-transparent --overlay-text \"28 June 2026\" --overlay-text \"AHUON Post Hajj Dinner\" --text-size 11 --text-size 9"
+  "cli_command": "python3 -m gatepass_generator generate -i operators.csv -o ./passes --template template.pdf --qr-size 130 --qr-align center --qr-border 0 --qr-transparent --overlay-text \"28 June 2026\" --overlay-text \"AHUON Post Hajj Dinner\" --text-size 11 --text-size 9"
 }

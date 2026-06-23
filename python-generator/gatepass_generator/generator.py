@@ -18,7 +18,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from PIL import Image
 
-from .models import GatePass, PassDesignSettings, QRAlignment, get_qr_secret
+from .models import GatePass, PassDesignSettings, PassManifest, QRAlignment, get_qr_secret
 
 # ── Font registration ────────────────────────────────────────────────────────
 
@@ -460,6 +460,70 @@ def generate_batch_pdfs(
     return paths
 
 
+def export_pdf_as_image(
+    pdf_path: str,
+    output_path: str,
+    dpi: int = 300,
+    fmt: str = "png",
+    jpeg_quality: int = 95,
+) -> str:
+    """Render a PDF page to PNG or JPEG at the specified DPI using PyMuPDF."""
+    import fitz
+
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    doc = fitz.open(pdf_path)
+    page = doc[0]
+    pix = page.get_pixmap(dpi=dpi)
+
+    if fmt.lower() in ("jpeg", "jpg"):
+        pix.save(output_path, output="jpeg", jpg_quality=jpeg_quality)
+    else:
+        pix.save(output_path, output="png")
+
+    doc.close()
+    return output_path
+
+
+def export_batch_images(
+    passes: List[GatePass],
+    output_dir: str,
+    secret: Optional[str] = None,
+    design: Optional[PassDesignSettings] = None,
+    dpi: int = 300,
+    fmt: str = "png",
+    jpeg_quality: int = 95,
+) -> List[str]:
+    """Generate PDFs then render each as PNG/JPEG. Returns list of image paths."""
+    os.makedirs(output_dir, exist_ok=True)
+
+    pdf_dir = os.path.join(output_dir, "_pdf_tmp")
+    pdf_paths = generate_batch_pdfs(passes, pdf_dir, secret=secret, design=design)
+
+    ext = "jpg" if fmt.lower() in ("jpeg", "jpg") else "png"
+    image_paths = []
+    for pdf_path in pdf_paths:
+        base = os.path.splitext(os.path.basename(pdf_path))[0]
+        img_path = os.path.join(output_dir, f"{base}.{ext}")
+        export_pdf_as_image(pdf_path, img_path, dpi=dpi, fmt=fmt, jpeg_quality=jpeg_quality)
+        image_paths.append(img_path)
+
+    import shutil
+    shutil.rmtree(pdf_dir, ignore_errors=True)
+
+    return image_paths
+
+
+def export_template_as_image(
+    template_path: str,
+    output_path: str,
+    dpi: int = 300,
+    fmt: str = "png",
+    jpeg_quality: int = 95,
+) -> str:
+    """Render a template PDF to PNG or JPEG at the specified DPI."""
+    return export_pdf_as_image(template_path, output_path, dpi=dpi, fmt=fmt, jpeg_quality=jpeg_quality)
+
+
 def create_passes_sheet(
     passes: List[GatePass],
     output_path: str,
@@ -535,3 +599,42 @@ def create_passes_sheet(
     ind_dir = os.path.join(os.path.dirname(output_path), "individuals")
     generate_batch_pdfs(passes, ind_dir, secret=secret, design=design)
     return output_path
+
+
+# ── Lock / Manifest ─────────────────────────────────────────────────────────
+
+
+def lock_input_file(input_path: str, output_dir: str, pass_count: int) -> PassManifest:
+    """Create a .lock manifest for the input file after successful generation."""
+    manifest = PassManifest(
+        input_file=str(input_path),
+        input_hash=PassManifest.hash_file(input_path),
+        output_dir=str(output_dir),
+        pass_count=pass_count,
+    )
+    manifest.write_lock()
+    return manifest
+
+
+def check_input_lock(input_path: str) -> tuple[Optional[PassManifest], bool]:
+    """Check if the input file is locked and whether it has been altered.
+
+    Returns (manifest_or_none, is_intact).
+    - (None, True)       → no lock exists, file is unlocked
+    - (manifest, True)   → locked, file matches the generation hash
+    - (manifest, False)  → locked, file has been ALTERED since generation
+    """
+    manifest = PassManifest.read_lock(input_path)
+    if manifest is None:
+        return None, True
+    current_hash = PassManifest.hash_file(input_path)
+    return manifest, current_hash == manifest.input_hash
+
+
+def unlock_input_file(input_path: str) -> bool:
+    """Remove the .lock file for the given input. Returns True if a lock was removed."""
+    lock_path = input_path + ".lock"
+    if os.path.isfile(lock_path):
+        os.remove(lock_path)
+        return True
+    return False
