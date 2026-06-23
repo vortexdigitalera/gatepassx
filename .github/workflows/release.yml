@@ -79,10 +79,8 @@ jobs:
 
 
 
-      - name: Setup Gradle (no cache — runner.temp is fresh per run, avoids corrupt jar restore)
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        env:
-          GRADLE_USER_HOME: ${{ runner.temp }}/.gradle
         with:
           gradle-version: wrapper
           cache-disabled: true
@@ -140,18 +138,10 @@ jobs:
         env:
           RUNNER_TEMP: ${{ runner.temp }}
         run: |
-          export GRADLE_USER_HOME=$RUNNER_TEMP/.gradle
           export PUB_CACHE="${HOME}/.pub-cache"
-          mkdir -p "$GRADLE_USER_HOME" "$PUB_CACHE"
-          echo "Gradle cache: $GRADLE_USER_HOME"
+          mkdir -p "$PUB_CACHE"
           echo "Pub cache: $PUB_CACHE"
           echo "Disk:"; df -h . || true
-
-      # Clean Gradle jar cache before build to avoid "Failed to create Jar file"
-      - name: Clean Gradle jar cache
-        env:
-          GRADLE_USER_HOME: ${{ runner.temp }}/.gradle
-        run: rm -rf $GRADLE_USER_HOME/caches/jars-* $GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle 2>/dev/null || true
 
       # ==================== FLUTTER ANDROID ====================
       - name: Get Flutter dependencies
@@ -161,12 +151,15 @@ jobs:
       - name: Build Android APK (release) - using debug key
         working-directory: mobile
         env:
-          GRADLE_USER_HOME: ${{ runner.temp }}/.gradle
           VERSION_NAME: ${{ steps.version.outputs.clean_version }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -e
           echo "Building APK versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER (using debug key)"
+
+          # Use a dedicated fresh Gradle home (setup-gradle action uses default home, not this)
+          export GRADLE_USER_HOME="${{ runner.temp }}/gradle-home"
+          mkdir -p "$GRADLE_USER_HOME"
 
           # macOS runner has different SDK path
           if [ "$(uname)" = "Darwin" ]; then
@@ -181,11 +174,6 @@ jobs:
 
           flutter clean
           flutter pub get
-
-          # Aggressive clean for bcprov jar issue
-          export GRADLE_USER_HOME=${{ runner.temp }}/.gradle
-          rm -rf "$GRADLE_USER_HOME/caches/jars-9" 2>/dev/null || true
-          rm -rf "$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle" 2>/dev/null || true
 
           flutter build apk --release \
             --build-name "$VERSION_NAME" \
