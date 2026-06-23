@@ -17,318 +17,147 @@ class PassesScreen extends StatefulWidget {
 class _PassesScreenState extends State<PassesScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
+  String _filter = 'all';
 
   @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
+  void dispose() { _searchCtrl.dispose(); super.dispose(); }
 
   List<GatePass> get _filtered {
-    if (_query.isEmpty) return widget.passes;
-    final q = _query.toLowerCase();
-    return widget.passes.where((p) =>
-      p.passId.toLowerCase().contains(q) ||
-      p.fullName.toLowerCase().contains(q) ||
-      p.idNumber.toLowerCase().contains(q) ||
-      p.organizer.toLowerCase().contains(q) ||
-      p.eventName.toLowerCase().contains(q)
-    ).toList();
+    var list = widget.passes;
+    switch (_filter) {
+      case 'active': list = list.where((p) => p.isActive).toList();
+      case 'notStarted': list = list.where((p) => p.isNotStarted).toList();
+      case 'expired': list = list.where((p) => p.isExpired).toList();
+      case 'scanned': list = list.where((p) => p.scannedToday).toList();
+    }
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+      list = list.where((p) => p.passId.toLowerCase().contains(q) || p.fullName.toLowerCase().contains(q) || p.idNumber.toLowerCase().contains(q) || p.eventName.toLowerCase().contains(q)).toList();
+    }
+    return list;
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     if (widget.passes.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: cs.surfaceContainerHigh, shape: BoxShape.circle),
-              child: Icon(Icons.app_registration_outlined, size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
-            ),
-            const SizedBox(height: 16),
-            Text('No passes yet', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
-            const SizedBox(height: 6),
-            Text('Use Issue tab or Import button', style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant.withValues(alpha: 0.6))),
-          ],
-        ),
-      );
+      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.app_registration, size: 56, color: cs.onSurfaceVariant.withValues(alpha: 0.3)),
+        const SizedBox(height: 12),
+        Text('No passes yet', style: tt.titleMedium?.copyWith(color: cs.onSurfaceVariant)),
+        const SizedBox(height: 4),
+        Text('Issue your first pass', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant.withValues(alpha: 0.6))),
+      ]));
     }
 
     final filtered = _filtered;
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-          child: SearchBar(
-            controller: _searchCtrl,
-            onChanged: (v) => setState(() => _query = v),
-            hintText: 'Search passes...',
-            leading: const Padding(padding: EdgeInsets.only(left: 12), child: Icon(Icons.manage_search_rounded, size: 24)),
-            trailing: _query.isNotEmpty
-                ? [IconButton(icon: const Icon(Icons.close_rounded, size: 22), onPressed: () { _searchCtrl.clear(); setState(() => _query = ''); })]
-                : null,
-            padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 4)),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: cs.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
-              child: Text('${filtered.length} pass${filtered.length == 1 ? '' : 'es'}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: cs.primary)),
-            ),
-          ),
-        ),
-        Expanded(
-          child: filtered.isEmpty
-              ? Center(child: Text('No matches found', style: GoogleFonts.inter(color: cs.onSurfaceVariant, fontSize: 15)))
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                  itemCount: filtered.length,
-                  itemBuilder: (ctx, i) => _buildPassCard(context, cs, filtered[i], i),
-                ),
-        ),
-      ],
-    );
+    return Column(children: [
+      Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 8), child: SearchBar(
+        controller: _searchCtrl,
+        onChanged: (v) => setState(() => _query = v),
+        hintText: 'Search passes...',
+        leading: const Padding(padding: EdgeInsets.only(left: 12), child: Icon(Icons.manage_search, size: 22)),
+        trailing: _query.isNotEmpty ? [IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () { _searchCtrl.clear(); setState(() => _query = ''); })] : null,
+        padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 4)),
+      )),
+      SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), child: Row(children: [
+        FilterChip(label: const Text('All'), selected: _filter == 'all', onSelected: (_) => setState(() => _filter = 'all')),
+        const SizedBox(width: 8),
+        FilterChip(label: const Text('Active'), selected: _filter == 'active', onSelected: (_) => setState(() => _filter = 'active')),
+        const SizedBox(width: 8),
+        FilterChip(label: const Text('Not Started'), selected: _filter == 'notStarted', onSelected: (_) => setState(() => _filter = 'notStarted')),
+        const SizedBox(width: 8),
+        FilterChip(label: const Text('Expired'), selected: _filter == 'expired', onSelected: (_) => setState(() => _filter = 'expired')),
+        const SizedBox(width: 8),
+        FilterChip(label: const Text('Scanned'), selected: _filter == 'scanned', onSelected: (_) => setState(() => _filter = 'scanned')),
+      ])),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6), child: Align(alignment: Alignment.centerLeft, child: Text('${filtered.length} pass${filtered.length == 1 ? '' : 'es'}', style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)))),
+      Expanded(child: filtered.isEmpty
+          ? Center(child: Text('No matches', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)))
+          : ListView.builder(padding: const EdgeInsets.fromLTRB(16, 0, 16, 100), itemCount: filtered.length, itemBuilder: (ctx, i) => _buildCard(cs, tt, filtered[i]))),
+    ]);
   }
 
-  Widget _buildPassCard(BuildContext context, ColorScheme cs, GatePass pass, int index) {
-    final statusColor = _statusColor(pass, cs);
+  Widget _buildCard(ColorScheme cs, TextTheme tt, GatePass pass) {
+    final statusColor = pass.isNotStarted ? Colors.orange : pass.isExpired ? cs.error : pass.scannedToday ? cs.tertiary : Colors.green;
     final statusLabel = pass.statusLabel;
-    final statusIcon = _statusIcon(pass);
+    final statusIcon = pass.isNotStarted ? Icons.schedule : pass.isExpired ? Icons.timer_off : pass.scannedToday ? Icons.replay : Icons.check_circle;
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 300 + index * 40),
-      curve: Curves.easeOutCubic,
-      builder: (ctx, val, child) => Transform.translate(
-        offset: Offset(0, (1 - val) * 20),
-        child: Opacity(opacity: val, child: child),
-      ),
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () => _showDetails(context, pass, cs),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: cs.primaryContainer,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Text(pass.category.name[0], style: GoogleFonts.inter(color: cs.onPrimaryContainer, fontWeight: FontWeight.w800, fontSize: 22)),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(pass.fullName, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16)),
-                      const SizedBox(height: 3),
-                      Text(pass.eventName, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500)),
-                      Text(pass.passId, style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontFamily: 'monospace')),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(statusIcon, size: 13, color: statusColor),
-                          const SizedBox(width: 4),
-                          Text(statusLabel, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor)),
-                        ],
-                      ),
-                    ),
-                    if (pass.scanCount > 0) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.sensors_rounded, size: 10, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
-                          const SizedBox(width: 2),
-                          Text('${pass.scanCount} scan${pass.scanCount == 1 ? '' : 's'}', style: GoogleFonts.inter(fontSize: 9, color: cs.onSurfaceVariant.withValues(alpha: 0.6))),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
+    return Card(
+      margin: const EdgeInsets.only(bottom: 6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showDetails(pass, cs, tt),
+        child: Padding(padding: const EdgeInsets.all(14), child: Row(children: [
+          Container(width: 48, height: 48, decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(12)), child: Center(child: Text(pass.category.name[0], style: GoogleFonts.inter(color: cs.onPrimaryContainer, fontWeight: FontWeight.w800, fontSize: 20)))),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(pass.fullName, style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+            Text(pass.eventName, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            Text(pass.passId, style: tt.labelSmall?.copyWith(fontFamily: 'monospace', color: cs.onSurfaceVariant.withValues(alpha: 0.5))),
+          ])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Badge(label: Row(mainAxisSize: MainAxisSize.min, children: [Icon(statusIcon, size: 12, color: statusColor), const SizedBox(width: 3), Text(statusLabel, style: tt.labelSmall?.copyWith(fontWeight: FontWeight.w700, color: statusColor))]), backgroundColor: statusColor.withValues(alpha: 0.08)),
+            if (pass.scanCount > 0) ...[const SizedBox(height: 4), Text('${pass.scanCount} scan${pass.scanCount == 1 ? '' : 's'}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant.withValues(alpha: 0.5)))],
+          ]),
+        ])),
       ),
     );
   }
 
-  Color _statusColor(GatePass pass, ColorScheme cs) {
-    if (pass.isNotStarted) return Colors.orange;
-    if (pass.isExpired) return cs.error;
-    if (pass.scannedToday) return cs.tertiary;
-    return Colors.green;
-  }
-
-  IconData _statusIcon(GatePass pass) {
-    if (pass.isNotStarted) return Icons.schedule_rounded;
-    if (pass.isExpired) return Icons.timer_off_rounded;
-    if (pass.scannedToday) return Icons.replay_rounded;
-    return Icons.check_circle_rounded;
-  }
-
-  void _showDetails(BuildContext context, GatePass pass, ColorScheme cs) {
+  void _showDetails(GatePass pass, ColorScheme cs, TextTheme tt) {
     final isValid = pass.isActive;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        clipBehavior: Clip.antiAlias,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 480, maxHeight: MediaQuery.of(ctx).size.height * 0.85),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(28),
-                  color: isValid ? cs.primaryContainer : cs.errorContainer,
-                  child: Column(
-                    children: [
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.elasticOut,
-                        builder: (_, val, child) => Transform.scale(scale: val, child: child),
-                        child: Icon(
-                          isValid ? Icons.verified_rounded : Icons.cancel_rounded,
-                          color: isValid ? cs.onPrimaryContainer : cs.onErrorContainer,
-                          size: 56,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(pass.statusLabel, style: GoogleFonts.inter(
-                        color: isValid ? cs.onPrimaryContainer : cs.onErrorContainer,
-                        fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: 1.2,
-                      )),
-                      const SizedBox(height: 6),
-                      Text(pass.eventName, style: GoogleFonts.inter(color: (isValid ? cs.onPrimaryContainer : cs.onErrorContainer).withValues(alpha: 0.7), fontSize: 13)),
-                      Text(pass.passId, style: TextStyle(color: (isValid ? cs.onPrimaryContainer : cs.onErrorContainer).withValues(alpha: 0.6), fontSize: 11, fontFamily: 'monospace')),
-                    ],
-                  ),
-                ),
-                if (pass.qrPayload != null)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
-                      child: QrImageView(
-                        data: pass.qrPayload!, version: QrVersions.auto, size: 150,
-                        eyeStyle: QrEyeStyle(color: cs.primary, eyeShape: QrEyeShape.circle),
-                        dataModuleStyle: QrDataModuleStyle(color: cs.primary, dataModuleShape: QrDataModuleShape.circle),
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                  child: Column(
-                    children: [
-                      _detailRow(Icons.celebration_rounded, 'Event', pass.eventName, cs),
-                      _detailRow(Icons.person_rounded, 'Name', pass.fullName, cs),
-                      _detailRow(Icons.fingerprint_rounded, 'ID', pass.idNumber, cs),
-                      _detailRow(Icons.label_rounded, 'Category', pass.category.name, cs),
-                      if (pass.phone != null && pass.phone!.isNotEmpty) _detailRow(Icons.call_rounded, 'Phone', pass.phone!, cs),
-                      if (pass.email != null && pass.email!.isNotEmpty) _detailRow(Icons.alternate_email_rounded, 'Email', pass.email!, cs),
-                      _detailRow(Icons.apartment_rounded, 'Organizer', pass.organizer, cs),
-                      if (pass.gate != null && pass.gate!.isNotEmpty) _detailRow(Icons.meeting_room_rounded, 'Gate', pass.gate!, cs),
-                      if (pass.tableNumber != null && pass.tableNumber!.isNotEmpty) _detailRow(Icons.grid_view_rounded, 'Table', pass.tableNumber!, cs),
-                      _detailRow(Icons.calendar_month_rounded, 'Valid', pass.formattedValidity, cs),
-                      _detailRow(Icons.sell_rounded, 'Type', pass.eventType.name, cs),
-                      if (pass.groupRef != null && pass.groupRef!.isNotEmpty) _detailRow(Icons.confirmation_number_rounded, 'Ref', pass.groupRef!, cs),
-                      _detailRow(Icons.pin_rounded, 'Scans', '${pass.scanCount}', cs),
-                      if (pass.lastScannedAt != null) _detailRow(Icons.history_toggle_off_rounded, 'Last Scan', DateFormat.yMd().add_jm().format(pass.lastScannedAt!), cs),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Row(
-                    children: [
-                      Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: Text('CLOSE', style: GoogleFonts.inter(fontWeight: FontWeight.w600)))),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () async {
-                            await widget.onAddLog(PassLog(passId: pass.passId, action: 'ENTRY', gate: pass.gate, valid: isValid, scanStatus: pass.isActive ? 'valid' : pass.statusLabel.toLowerCase()));
-                            if (isValid) {
-                              final updated = GatePass(
-                                passId: pass.passId, eventName: pass.eventName, eventType: pass.eventType,
-                                category: pass.category, fullName: pass.fullName, idNumber: pass.idNumber,
-                                phone: pass.phone, email: pass.email, organizer: pass.organizer,
-                                validFrom: pass.validFrom, validTo: pass.validTo, gate: pass.gate,
-                                tableNumber: pass.tableNumber, groupRef: pass.groupRef,
-                                issuedAt: pass.issuedAt, issuedBy: pass.issuedBy,
-                                lastScannedAt: DateTime.now(), scanCount: pass.scanCount + 1,
-                              )..qrPayload = pass.qrPayload;
-                              await widget.onUpdatePass(updated);
-                            }
-                            if (ctx.mounted) Navigator.pop(ctx);
-                          },
-                          icon: const Icon(Icons.door_front_door_rounded, size: 20),
-                          label: Text('Log ENTRY', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    showDialog(context: context, builder: (ctx) => Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(constraints: BoxConstraints(maxWidth: 480, maxHeight: MediaQuery.of(ctx).size.height * 0.85), child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: double.infinity, padding: const EdgeInsets.all(24), color: isValid ? cs.primaryContainer : cs.errorContainer, child: Column(children: [
+          Icon(isValid ? Icons.verified : Icons.cancel, color: isValid ? cs.onPrimaryContainer : cs.onErrorContainer, size: 56),
+          const SizedBox(height: 8),
+          Text(pass.statusLabel, style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: isValid ? cs.onPrimaryContainer : cs.onErrorContainer, letterSpacing: 1)),
+          const SizedBox(height: 4),
+          Text(pass.eventName, style: tt.bodySmall?.copyWith(color: (isValid ? cs.onPrimaryContainer : cs.onErrorContainer).withValues(alpha: 0.7))),
+        ])),
+        if (pass.qrPayload != null) Padding(padding: const EdgeInsets.fromLTRB(24, 16, 24, 8), child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)), child: QrImageView(data: pass.qrPayload!, version: QrVersions.auto, size: 150, eyeStyle: QrEyeStyle(color: cs.primary, eyeShape: QrEyeShape.circle), dataModuleStyle: QrDataModuleStyle(color: cs.primary, dataModuleShape: QrDataModuleShape.circle)))),
+        Padding(padding: const EdgeInsets.fromLTRB(24, 8, 24, 16), child: Column(children: [
+          _row(Icons.celebration, 'Event', pass.eventName, cs, tt),
+          _row(Icons.person, 'Name', pass.fullName, cs, tt),
+          _row(Icons.fingerprint, 'ID', pass.idNumber, cs, tt),
+          _row(Icons.label, 'Category', pass.category.name, cs, tt),
+          if (pass.phone != null && pass.phone!.isNotEmpty) _row(Icons.call, 'Phone', pass.phone!, cs, tt),
+          _row(Icons.apartment, 'Organizer', pass.organizer, cs, tt),
+          if (pass.gate != null && pass.gate!.isNotEmpty) _row(Icons.meeting_room, 'Gate', pass.gate!, cs, tt),
+          if (pass.tableNumber != null && pass.tableNumber!.isNotEmpty) _row(Icons.grid_view, 'Table', pass.tableNumber!, cs, tt),
+          _row(Icons.calendar_month, 'Valid', pass.formattedValidity, cs, tt),
+          _row(Icons.sell, 'Type', pass.eventType.name, cs, tt),
+          _row(Icons.pin, 'Scans', '${pass.scanCount}', cs, tt),
+          if (pass.lastScannedAt != null) _row(Icons.history_toggle_off, 'Last Scan', DateFormat.yMd().add_jm().format(pass.lastScannedAt!), cs, tt),
+        ])),
+        Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), child: Row(children: [
+          Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE'))),
+          const SizedBox(width: 12),
+          Expanded(child: FilledButton.icon(onPressed: () async {
+            await widget.onAddLog(PassLog(passId: pass.passId, action: 'ENTRY', gate: pass.gate, valid: isValid, scanStatus: pass.isActive ? 'valid' : pass.statusLabel.toLowerCase()));
+            if (isValid) {
+              final updated = GatePass(passId: pass.passId, eventName: pass.eventName, eventType: pass.eventType, category: pass.category, fullName: pass.fullName, idNumber: pass.idNumber, phone: pass.phone, email: pass.email, organizer: pass.organizer, validFrom: pass.validFrom, validTo: pass.validTo, gate: pass.gate, tableNumber: pass.tableNumber, groupRef: pass.groupRef, issuedAt: pass.issuedAt, issuedBy: pass.issuedBy, lastScannedAt: DateTime.now(), scanCount: pass.scanCount + 1)..qrPayload = pass.qrPayload;
+              await widget.onUpdatePass(updated);
+            }
+            if (ctx.mounted) Navigator.pop(ctx);
+          }, icon: const Icon(Icons.door_front_door, size: 18), label: const Text('Log ENTRY'))),
+        ])),
+      ]))),
+    ));
   }
 
-  Widget _detailRow(IconData icon, String label, String value, ColorScheme cs) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(6)),
-            child: Icon(icon, size: 16, color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(width: 10),
-          SizedBox(width: 68, child: Text(label, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500))),
-          Expanded(child: Text(value, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500))),
-        ],
-      ),
-    );
+  Widget _row(IconData icon, String label, String value, ColorScheme cs, TextTheme tt) {
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(children: [
+      Icon(icon, size: 16, color: cs.onSurfaceVariant),
+      const SizedBox(width: 10),
+      SizedBox(width: 68, child: Text(label, style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant))),
+      Expanded(child: Text(value, style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w500))),
+    ]));
   }
 }

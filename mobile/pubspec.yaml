@@ -2,7 +2,7 @@ name: gatepassx
 description: "DePass - Dinner & Event Gate Pass Scanner and QR Generator"
 publish_to: 'none'
 
-version: 23.2.0+25
+version: 24.0.0+26
 
 environment:
   sdk: '>=3.4.3 <4.0.0'

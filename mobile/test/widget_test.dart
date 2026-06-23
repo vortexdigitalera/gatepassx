@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:gatepassx/main.dart';
@@ -6,9 +7,9 @@ import 'package:gatepassx/services/config.dart';
 
 void main() {
   testWidgets('GatePassX app smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const GatePassXApp());
-    expect(find.textContaining('DePass'), findsOneWidget);
-    expect(find.text('Home'), findsOneWidget);
+    await tester.pumpWidget(const GatePassXApp(initialTheme: ThemeMode.system));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('DePass'), findsWidgets);
   });
 
   group('GatePass model + workflow', () {

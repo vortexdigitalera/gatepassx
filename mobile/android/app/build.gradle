@@ -26,8 +26,8 @@ if (flutterVersionName == null) {
 
 android {
     namespace = "com.rabyte.depass"
-    compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    compileSdk = 35
+    ndkVersion = "28.0.13004108"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -41,7 +41,7 @@ android {
     defaultConfig {
         applicationId = "com.rabyte.depass"
         minSdk = Math.max(flutter.minSdkVersion ?: 21, 23)
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 35
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
     }
@@ -54,7 +54,7 @@ android {
                 storePassword = cfg.storePassword
                 keyAlias = cfg.keyAlias
                 keyPassword = cfg.keyPassword
-                println "GatePassX: RELEASE signing key enabled from env/key.properties"
+                println "GatePassX: RELEASE signing key enabled"
             } else {
                 storeFile = signingConfigs.debug.storeFile
                 storePassword = signingConfigs.debug.storePassword
@@ -68,6 +68,9 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.release
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
