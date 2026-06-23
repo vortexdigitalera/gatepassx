@@ -32,11 +32,10 @@ jobs:
         run: |
           set -e
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ -z "${{ github.event.inputs.version }}" ]; then
-              echo "::error::Version input is required for manual dispatch"
-              exit 1
-            fi
             VERSION="${{ github.event.inputs.version }}"
+            if [ -z "$VERSION" ]; then
+              VERSION="2026.07.22"
+            fi
           else
             VERSION="${{ github.ref_name }}"
           fi
