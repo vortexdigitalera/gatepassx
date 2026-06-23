@@ -152,6 +152,34 @@ jobs:
           GRADLE_USER_HOME: ${{ runner.temp }}/.gradle
         run: rm -rf $GRADLE_USER_HOME/caches/jars-* $GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle 2>/dev/null || true
 
+      # === RELEASE signing key setup (use the new keystore R@b1u2004@ ) ===
+      - name: Prepare Android RELEASE signing key
+        id: signing
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 || secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS || secrets.ANDROID_KEY_ALIAS || 'upload' }}
+          KEY_PASS: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD || secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -e
+          SIGNING_DIR="${RUNNER_TEMP}/signing"
+          mkdir -p "$SIGNING_DIR"
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$SIGNING_DIR/release-keystore.jks"
+            chmod 600 "$SIGNING_DIR/release-keystore.jks" || true
+            {
+              echo "ANDROID_KEYSTORE_PATH=$SIGNING_DIR/release-keystore.jks"
+              echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASS"
+              echo "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+              echo "ANDROID_KEY_PASSWORD=$KEY_PASS"
+            } >> $GITHUB_ENV
+            echo "keystore_prepared=true" >> $GITHUB_OUTPUT
+            echo "RELEASE signing key prepared from secrets."
+          else
+            echo "keystore_prepared=false" >> $GITHUB_OUTPUT
+            echo "::warning::No release keystore secret. Will fall back."
+          fi
+
       # ==================== FLUTTER ANDROID ====================
       - name: Get Flutter dependencies
         working-directory: mobile
@@ -166,9 +194,22 @@ jobs:
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
           VERSION_NAME: ${{ steps.version.outputs.clean_version }}
           BUILD_NUMBER: ${{ github.run_number }}
+          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEYSTORE_PATH || '' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEYSTORE_PASSWORD || '' }}
+          ANDROID_KEY_ALIAS: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEY_ALIAS || '' }}
+          ANDROID_KEY_PASSWORD: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEY_PASSWORD || '' }}
         run: |
           set -e
           echo "Building APK versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
+          echo "Keystore: ${ANDROID_KEYSTORE_PATH:-<none>}"
+
+          flutter clean
+          flutter pub get
+
+          # Targeted clean for bcprov jar corruption
+          export GRADLE_USER_HOME=${{ runner.temp }}/.gradle
+          rm -rf "$GRADLE_USER_HOME/caches/jars-9" 2>/dev/null || true
+          rm -rf "$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle/bcprov-jdk18on/1.79" 2>/dev/null || true
 
           flutter build apk --release \
             --build-name "$VERSION_NAME" \
