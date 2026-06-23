@@ -74,18 +74,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-android-sdk-
 
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle-wrapper.properties', '**/*.gradle*', '**/gradle.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+
 
       - name: Setup Gradle
-        uses: gradle/gradle-build-action@v3
+        uses: gradle/actions/setup-gradle@v4
+        env:
+          GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
         with:
           gradle-version: wrapper
 
@@ -137,11 +131,13 @@ jobs:
         with:
           python-version: '3.12'
 
-      # === Prepare caches (use default locations for Gradle to avoid /tmp issues) ===
+      # === Prepare caches (use $GITHUB_WORKSPACE for Gradle to avoid /tmp privilege issues) ===
       - name: Prepare caches
         run: |
+          export GRADLE_USER_HOME=${{ github.workspace }}/.gradle
           export PUB_CACHE=/home/runner/.pub-cache
-          mkdir -p "$PUB_CACHE"
+          mkdir -p "$GRADLE_USER_HOME" "$PUB_CACHE"
+          echo "Gradle cache: $GRADLE_USER_HOME"
           echo "Pub cache: $PUB_CACHE"
           df -h /tmp
 
@@ -153,6 +149,7 @@ jobs:
       - name: Build Android APK (release)
         working-directory: mobile
         env:
+          GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
           PUB_CACHE: /home/runner/.pub-cache
           ANDROID_HOME: /usr/local/lib/android/sdk
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
