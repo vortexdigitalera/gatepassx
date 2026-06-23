@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart' show sha256, Hmac;
 import 'package:intl/intl.dart';
 
+// ignore_for_file: constant_identifier_names
 enum PassCategory { PILGRIM, STAFF, VEHICLE, VISITOR, VIP }
 enum TripType { HAJJ, UMRAH }
 

@@ -77,8 +77,10 @@ class _IssuePassScreenState extends State<IssuePassScreen> {
 
   Future<void> _shareQr() async {
     if (_generatedPass?.qrPayload == null) return;
-    await Share.share(
-      'AHUON Gate Pass\nID: ${_generatedPass!.passId}\nName: ${_generatedPass!.fullName}\nQR: ${_generatedPass!.qrPayload}',
+    await SharePlus.instance.share(
+      ShareParams(
+        text: 'AHUON Gate Pass\nID: ${_generatedPass!.passId}\nName: ${_generatedPass!.fullName}\nQR: ${_generatedPass!.qrPayload}',
+      ),
     );
   }
 

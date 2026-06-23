@@ -130,7 +130,7 @@ class _GatePassHomeState extends State<GatePassHome> {
     final file = File('${dir.path}/ahuon_passes_export_${DateTime.now().millisecondsSinceEpoch}.json');
     final data = _passes.map((p) => p.toJson()).toList();
     await file.writeAsString(jsonEncode({'passes': data, 'exported_at': DateTime.now().toIso8601String()}));
-    await Share.share('Exported AHUON passes JSON saved to ${file.path}. Use the Python generator to create PDFs.');
+    await SharePlus.instance.share(ShareParams(text: 'Exported AHUON passes JSON saved to ${file.path}. Use the Python generator to create PDFs.'));
   }
 
   List<Widget> get _screens => [
