@@ -323,17 +323,17 @@ class _GatePassHomeState extends State<GatePassHome> {
                 ),
                 actions: [
                   IconButton(
-                    icon: const Icon(Icons.file_download_rounded, size: 24),
+                    icon: const Icon(Icons.download_rounded, size: 24),
                     tooltip: 'Import',
                     onPressed: _importPasses,
                   ),
                   IconButton(
-                    icon: const Icon(Icons.upload_rounded, size: 24),
+                    icon: const Icon(Icons.publish_rounded, size: 24),
                     tooltip: 'Export',
                     onPressed: _passes.isEmpty ? null : _exportAll,
                   ),
                   IconButton(
-                    icon: const Icon(Icons.refresh_rounded, size: 24),
+                    icon: const Icon(Icons.sync_rounded, size: 24),
                     tooltip: 'Refresh',
                     onPressed: _loadData,
                   ),
@@ -356,7 +356,6 @@ class _GatePassHomeState extends State<GatePassHome> {
                   ),
                 ),
                 child: IndexedStack(
-                  key: ValueKey(_currentIndex),
                   index: _currentIndex,
                   children: [
                     DashboardScreen(
@@ -391,28 +390,28 @@ class _GatePassHomeState extends State<GatePassHome> {
                       onDestinationSelected: _onTabChange,
                       destinations: const [
                         NavigationDestination(
-                          icon: Icon(Icons.dashboard_outlined),
-                          selectedIcon: Icon(Icons.dashboard_rounded),
+                          icon: Icon(Icons.space_dashboard_outlined),
+                          selectedIcon: Icon(Icons.space_dashboard_rounded),
                           label: 'Home',
                         ),
                         NavigationDestination(
-                          icon: Icon(Icons.add_card_outlined),
-                          selectedIcon: Icon(Icons.add_card_rounded),
+                          icon: Icon(Icons.note_add_outlined),
+                          selectedIcon: Icon(Icons.note_add_rounded),
                           label: 'Issue',
                         ),
                         NavigationDestination(
-                          icon: Icon(Icons.badge_outlined),
-                          selectedIcon: Icon(Icons.badge_rounded),
+                          icon: Icon(Icons.app_registration_outlined),
+                          selectedIcon: Icon(Icons.app_registration_rounded),
                           label: 'Passes',
                         ),
                         NavigationDestination(
-                          icon: Icon(Icons.qr_code_scanner_rounded),
-                          selectedIcon: Icon(Icons.qr_code_scanner_rounded),
+                          icon: Icon(Icons.qr_code_2_rounded),
+                          selectedIcon: Icon(Icons.qr_code_2_rounded),
                           label: 'Scan',
                         ),
                         NavigationDestination(
-                          icon: Icon(Icons.history_rounded),
-                          selectedIcon: Icon(Icons.history_rounded),
+                          icon: Icon(Icons.history_toggle_off_rounded),
+                          selectedIcon: Icon(Icons.history_toggle_off_rounded),
                           label: 'Logs',
                         ),
                       ],

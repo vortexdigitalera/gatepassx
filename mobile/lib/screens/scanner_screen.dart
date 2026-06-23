@@ -159,9 +159,10 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     );
     widget.onAddLog(log);
 
-    // Update lastScannedAt for valid/duplicate scans
+    // Update lastScannedAt and scanCount for valid/duplicate scans
     if (result.match != null && (result.status == PassScanStatus.valid || result.status == PassScanStatus.duplicate)) {
       result.match!.lastScannedAt = DateTime.now();
+      result.match!.scanCount += 1;
       widget.onUpdatePass(result.match!);
     }
 
@@ -246,9 +247,9 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                                const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
                                 const SizedBox(width: 6),
-                                Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 18),
+                                Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 18),
                                 const SizedBox(width: 6),
                                 Text('SCANNER', style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
                               ],
@@ -265,7 +266,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
                                   _controller.toggleTorch();
                                 },
                                 icon: Icon(
-                                  _torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                                  _torchOn ? Icons.bolt_rounded : Icons.bolt_outlined,
                                   color: _torchOn ? Colors.amber : Colors.white70,
                                   size: 24,
                                 ),
@@ -367,7 +368,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       ),
       child: Row(
         children: [
-          Padding(padding: const EdgeInsets.only(left: 14), child: Icon(Icons.paste_rounded, color: Colors.white38, size: 20)),
+          Padding(padding: const EdgeInsets.only(left: 14), child: Icon(Icons.content_paste_rounded, color: Colors.white38, size: 20)),
           Expanded(
             child: TextField(
               controller: _pasteCtrl,
@@ -384,7 +385,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: IconButton(
-              icon: Icon(Icons.send_rounded, color: cs.tertiary, size: 22),
+              icon: Icon(Icons.arrow_circle_up_rounded, color: cs.tertiary, size: 22),
               onPressed: () => _manualSubmit(_pasteCtrl.text),
               style: IconButton.styleFrom(
                 backgroundColor: Colors.white.withValues(alpha: 0.1),
@@ -571,7 +572,7 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
                     flex: 2,
                     child: FilledButton.icon(
                       onPressed: widget.onScanAgain,
-                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 22),
+                      icon: const Icon(Icons.qr_code_2_rounded, size: 22),
                       label: Text('SCAN AGAIN', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                     ),
                   ),
@@ -630,20 +631,21 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
           const SizedBox(height: 14),
           Divider(height: 1, color: cs.outlineVariant),
           const SizedBox(height: 10),
-          _infoRow(Icons.event_rounded, 'Event', m.eventName, cs),
-          _infoRow(Icons.assignment_ind_rounded, 'ID', m.idNumber, cs),
+          _infoRow(Icons.celebration_rounded, 'Event', m.eventName, cs),
+          _infoRow(Icons.fingerprint_rounded, 'ID', m.idNumber, cs),
           if (m.phone != null && m.phone!.isNotEmpty)
-            _infoRow(Icons.phone_rounded, 'Phone', m.phone!, cs),
-          _infoRow(Icons.business_rounded, 'Organizer', m.organizer, cs),
+            _infoRow(Icons.call_rounded, 'Phone', m.phone!, cs),
+          _infoRow(Icons.apartment_rounded, 'Organizer', m.organizer, cs),
           if (m.gate != null && m.gate!.isNotEmpty)
-            _infoRow(Icons.location_on_rounded, 'Gate', m.gate!, cs),
+            _infoRow(Icons.meeting_room_rounded, 'Gate', m.gate!, cs),
           if (m.tableNumber != null && m.tableNumber!.isNotEmpty)
-            _infoRow(Icons.table_restaurant_rounded, 'Table', m.tableNumber!, cs),
-          _infoRow(Icons.date_range_rounded, 'Valid',
+            _infoRow(Icons.grid_view_rounded, 'Table', m.tableNumber!, cs),
+          _infoRow(Icons.calendar_month_rounded, 'Valid',
               '${DateFormat('dd MMM yyyy').format(m.validFrom)} — ${DateFormat('dd MMM yyyy').format(m.validTo)}', cs),
-          _infoRow(Icons.category_rounded, 'Type', m.eventType.name, cs),
+          _infoRow(Icons.sell_rounded, 'Type', m.eventType.name, cs),
+          _infoRow(Icons.pin_rounded, 'Scans', '${m.scanCount}', cs),
           if (m.lastScannedAt != null)
-            _infoRow(Icons.history_rounded, 'Last Scan', DateFormat.yMd().add_jm().format(m.lastScannedAt!), cs),
+            _infoRow(Icons.history_toggle_off_rounded, 'Last Scan', DateFormat.yMd().add_jm().format(m.lastScannedAt!), cs),
         ],
       ),
     );

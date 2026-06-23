@@ -19,7 +19,7 @@ class LogsScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(color: cs.surfaceContainerHigh, shape: BoxShape.circle),
-              child: Icon(Icons.history_rounded, size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+              child: Icon(Icons.history_toggle_off_rounded, size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
             ),
             const SizedBox(height: 16),
             Text('No activity yet', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
@@ -77,7 +77,7 @@ class LogsScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.schedule_rounded, size: 13, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
+                        Icon(Icons.access_time_rounded, size: 13, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
@@ -92,7 +92,7 @@ class LogsScreen extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 2),
                         child: Row(
                           children: [
-                            Icon(Icons.location_on_rounded, size: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                            Icon(Icons.place_rounded, size: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
                             const SizedBox(width: 4),
                             Text(l.gate!, style: GoogleFonts.inter(fontSize: 11, color: cs.onSurfaceVariant.withValues(alpha: 0.7))),
                           ],
@@ -160,10 +160,10 @@ class LogsScreen extends StatelessWidget {
       if (l.scanStatus == 'expired') return _LogConfig(Icons.timer_off_rounded, cs.error);
       if (l.scanStatus == 'duplicate') return _LogConfig(Icons.replay_rounded, cs.tertiary);
       if (l.scanStatus == 'unknown') return _LogConfig(Icons.help_outline_rounded, Colors.grey);
-      return _LogConfig(Icons.block_rounded, cs.error);
+      return _LogConfig(Icons.do_not_disturb_on_rounded, cs.error);
     }
-    if (isEntry) return _LogConfig(Icons.login_rounded, Colors.green);
-    return _LogConfig(Icons.logout_rounded, cs.tertiary);
+    if (isEntry) return _LogConfig(Icons.door_front_door_rounded, Colors.green);
+    return _LogConfig(Icons.exit_to_app_rounded, cs.tertiary);
   }
 }
 

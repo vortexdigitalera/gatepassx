@@ -48,7 +48,7 @@ class _PassesScreenState extends State<PassesScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(color: cs.surfaceContainerHigh, shape: BoxShape.circle),
-              child: Icon(Icons.badge_outlined, size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+              child: Icon(Icons.app_registration_outlined, size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
             ),
             const SizedBox(height: 16),
             Text('No passes yet', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
@@ -69,9 +69,9 @@ class _PassesScreenState extends State<PassesScreen> {
             controller: _searchCtrl,
             onChanged: (v) => setState(() => _query = v),
             hintText: 'Search passes...',
-            leading: const Padding(padding: EdgeInsets.only(left: 12), child: Icon(Icons.search_rounded, size: 24)),
+            leading: const Padding(padding: EdgeInsets.only(left: 12), child: Icon(Icons.manage_search_rounded, size: 24)),
             trailing: _query.isNotEmpty
-                ? [IconButton(icon: const Icon(Icons.clear_rounded, size: 22), onPressed: () { _searchCtrl.clear(); setState(() => _query = ''); })]
+                ? [IconButton(icon: const Icon(Icons.close_rounded, size: 22), onPressed: () { _searchCtrl.clear(); setState(() => _query = ''); })]
                 : null,
             padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 4)),
           ),
@@ -164,9 +164,16 @@ class _PassesScreenState extends State<PassesScreen> {
                         ],
                       ),
                     ),
-                    if (pass.scannedToday) ...[
+                    if (pass.scanCount > 0) ...[
                       const SizedBox(height: 4),
-                      Text('Scanned today', style: GoogleFonts.inter(fontSize: 9, color: cs.onSurfaceVariant.withValues(alpha: 0.6))),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.sensors_rounded, size: 10, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
+                          const SizedBox(width: 2),
+                          Text('${pass.scanCount} scan${pass.scanCount == 1 ? '' : 's'}', style: GoogleFonts.inter(fontSize: 9, color: cs.onSurfaceVariant.withValues(alpha: 0.6))),
+                        ],
+                      ),
                     ],
                   ],
                 ),
@@ -251,19 +258,20 @@ class _PassesScreenState extends State<PassesScreen> {
                   padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
                   child: Column(
                     children: [
-                      _detailRow(Icons.event_rounded, 'Event', pass.eventName, cs),
+                      _detailRow(Icons.celebration_rounded, 'Event', pass.eventName, cs),
                       _detailRow(Icons.person_rounded, 'Name', pass.fullName, cs),
-                      _detailRow(Icons.assignment_ind_rounded, 'ID', pass.idNumber, cs),
-                      _detailRow(Icons.category_rounded, 'Category', pass.category.name, cs),
-                      if (pass.phone != null && pass.phone!.isNotEmpty) _detailRow(Icons.phone_rounded, 'Phone', pass.phone!, cs),
-                      if (pass.email != null && pass.email!.isNotEmpty) _detailRow(Icons.email_rounded, 'Email', pass.email!, cs),
-                      _detailRow(Icons.business_rounded, 'Organizer', pass.organizer, cs),
-                      if (pass.gate != null && pass.gate!.isNotEmpty) _detailRow(Icons.location_on_rounded, 'Gate', pass.gate!, cs),
-                      if (pass.tableNumber != null && pass.tableNumber!.isNotEmpty) _detailRow(Icons.table_restaurant_rounded, 'Table', pass.tableNumber!, cs),
-                      _detailRow(Icons.date_range_rounded, 'Valid', pass.formattedValidity, cs),
-                      _detailRow(Icons.event_rounded, 'Type', pass.eventType.name, cs),
+                      _detailRow(Icons.fingerprint_rounded, 'ID', pass.idNumber, cs),
+                      _detailRow(Icons.label_rounded, 'Category', pass.category.name, cs),
+                      if (pass.phone != null && pass.phone!.isNotEmpty) _detailRow(Icons.call_rounded, 'Phone', pass.phone!, cs),
+                      if (pass.email != null && pass.email!.isNotEmpty) _detailRow(Icons.alternate_email_rounded, 'Email', pass.email!, cs),
+                      _detailRow(Icons.apartment_rounded, 'Organizer', pass.organizer, cs),
+                      if (pass.gate != null && pass.gate!.isNotEmpty) _detailRow(Icons.meeting_room_rounded, 'Gate', pass.gate!, cs),
+                      if (pass.tableNumber != null && pass.tableNumber!.isNotEmpty) _detailRow(Icons.grid_view_rounded, 'Table', pass.tableNumber!, cs),
+                      _detailRow(Icons.calendar_month_rounded, 'Valid', pass.formattedValidity, cs),
+                      _detailRow(Icons.sell_rounded, 'Type', pass.eventType.name, cs),
                       if (pass.groupRef != null && pass.groupRef!.isNotEmpty) _detailRow(Icons.confirmation_number_rounded, 'Ref', pass.groupRef!, cs),
-                      if (pass.lastScannedAt != null) _detailRow(Icons.history_rounded, 'Last Scan', DateFormat.yMd().add_jm().format(pass.lastScannedAt!), cs),
+                      _detailRow(Icons.pin_rounded, 'Scans', '${pass.scanCount}', cs),
+                      if (pass.lastScannedAt != null) _detailRow(Icons.history_toggle_off_rounded, 'Last Scan', DateFormat.yMd().add_jm().format(pass.lastScannedAt!), cs),
                     ],
                   ),
                 ),
@@ -279,11 +287,12 @@ class _PassesScreenState extends State<PassesScreen> {
                             await widget.onAddLog(PassLog(passId: pass.passId, action: 'ENTRY', gate: pass.gate, valid: isValid, scanStatus: pass.isActive ? 'valid' : pass.statusLabel.toLowerCase()));
                             if (isValid) {
                               pass.lastScannedAt = DateTime.now();
+                              pass.scanCount += 1;
                               await widget.onUpdatePass(pass);
                             }
                             if (ctx.mounted) Navigator.pop(ctx);
                           },
-                          icon: const Icon(Icons.login_rounded, size: 20),
+                          icon: const Icon(Icons.door_front_door_rounded, size: 20),
                           label: Text('Log ENTRY', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                         ),
                       ),

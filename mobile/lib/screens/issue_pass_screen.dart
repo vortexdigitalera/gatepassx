@@ -137,7 +137,7 @@ class _IssuePassScreenState extends State<IssuePassScreen> with SingleTickerProv
                 initialValue: _eventType,
                 decoration: const InputDecoration(
                   labelText: 'Event Type',
-                  prefixIcon: Icon(Icons.event_outlined),
+                  prefixIcon: Icon(Icons.celebration_outlined),
                 ),
                 items: EventType.values.map((t) => DropdownMenuItem(value: t, child: Text(t.name))).toList(),
                 onChanged: (v) => setState(() => _eventType = v!),
@@ -155,30 +155,30 @@ class _IssuePassScreenState extends State<IssuePassScreen> with SingleTickerProv
               const SizedBox(height: 14),
               TextFormField(
                 controller: _idCtrl,
-                decoration: const InputDecoration(labelText: 'ID / Registration Number', prefixIcon: Icon(Icons.assignment_ind_outlined)),
+                decoration: const InputDecoration(labelText: 'ID / Registration Number', prefixIcon: Icon(Icons.fingerprint_outlined)),
                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _phoneCtrl,
-                decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone_outlined)),
+                decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.call_outlined)),
                 keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _emailCtrl,
-                decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
+                decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.alternate_email_outlined)),
                 keyboardType: TextInputType.emailAddress,
               ),
             ]),
             const SizedBox(height: 24),
 
-            _buildSection(cs, 'PASS TYPE', Icons.category_rounded, [
+            _buildSection(cs, 'PASS TYPE', Icons.label_rounded, [
               DropdownButtonFormField<PassCategory>(
                 initialValue: _category,
                 decoration: const InputDecoration(
                   labelText: 'Category',
-                  prefixIcon: Icon(Icons.category_outlined),
+                  prefixIcon: Icon(Icons.label_outlined),
                 ),
                 items: PassCategory.values.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
                 onChanged: (v) => setState(() => _category = v!),
@@ -186,20 +186,20 @@ class _IssuePassScreenState extends State<IssuePassScreen> with SingleTickerProv
             ]),
             const SizedBox(height: 24),
 
-            _buildSection(cs, 'ORGANIZATION', Icons.business_rounded, [
+            _buildSection(cs, 'ORGANIZATION', Icons.apartment_rounded, [
               TextFormField(
                 controller: _organizerCtrl,
-                decoration: const InputDecoration(labelText: 'Organizer', prefixIcon: Icon(Icons.business_outlined)),
+                decoration: const InputDecoration(labelText: 'Organizer', prefixIcon: Icon(Icons.apartment_outlined)),
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _gateCtrl,
-                decoration: const InputDecoration(labelText: 'Gate / Entrance', prefixIcon: Icon(Icons.location_on_outlined)),
+                decoration: const InputDecoration(labelText: 'Gate / Entrance', prefixIcon: Icon(Icons.meeting_room_outlined)),
               ),
             ]),
             const SizedBox(height: 24),
 
-            _buildSection(cs, 'VALIDITY PERIOD', Icons.date_range_rounded, [
+            _buildSection(cs, 'VALIDITY PERIOD', Icons.calendar_month_rounded, [
               Row(
                 children: [
                   Expanded(child: _buildDateField(cs, 'From', _validFrom, () => _pickDate(true))),
@@ -210,10 +210,10 @@ class _IssuePassScreenState extends State<IssuePassScreen> with SingleTickerProv
             ]),
             const SizedBox(height: 24),
 
-            _buildSection(cs, 'SEATING & REFERENCES', Icons.table_restaurant_rounded, [
+            _buildSection(cs, 'SEATING & REFERENCES', Icons.grid_view_rounded, [
               TextFormField(
                 controller: _tableCtrl,
-                decoration: const InputDecoration(labelText: 'Table / Seat Number', prefixIcon: Icon(Icons.table_restaurant_outlined)),
+                decoration: const InputDecoration(labelText: 'Table / Seat Number', prefixIcon: Icon(Icons.grid_view_outlined)),
               ),
               const SizedBox(height: 14),
               TextFormField(

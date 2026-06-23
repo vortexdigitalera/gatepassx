@@ -41,15 +41,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final now = DateTime.now();
     final active = widget.passes.where((p) => p.isActive).length;
     final notStarted = widget.passes.where((p) => p.isNotStarted).length;
     final expired = widget.passes.where((p) => p.isExpired).length;
-    final todayEntries = widget.logs.where((l) =>
-        l.action == 'ENTRY' &&
-        l.timestamp.year == now.year &&
-        l.timestamp.month == now.month &&
-        l.timestamp.day == now.day).length;
+    final totalScans = widget.passes.fold<int>(0, (sum, p) => sum + p.scanCount);
 
     // Find nearest upcoming event
     final upcomingPasses = widget.passes.where((p) => p.isNotStarted).toList()
@@ -66,7 +61,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
             children: [
-              _buildHeroCard(context, cs, active, todayEntries, isWide),
+              _buildHeroCard(context, cs, active, totalScans, isWide),
               const SizedBox(height: 16),
               // Status breakdown row
               Row(
@@ -113,7 +108,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildHeroCard(BuildContext context, ColorScheme cs, int active, int todayEntries, bool isWide) {
+  Widget _buildHeroCard(BuildContext context, ColorScheme cs, int active, int totalScans, bool isWide) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 500),
       curve: Curves.easeOutCubic,
@@ -166,9 +161,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Row(children: [
                 _buildStatCard(cs, 'Active', active.toString(), Icons.check_circle_rounded, cs.tertiary),
                 const SizedBox(width: 8),
-                _buildStatCard(cs, "Today's Scans", todayEntries.toString(), Icons.login_rounded, cs.secondary),
+                _buildStatCard(cs, 'Total Scans', totalScans.toString(), Icons.sensors_rounded, cs.secondary),
                 const SizedBox(width: 8),
-                _buildStatCard(cs, 'Total', widget.passes.length.toString(), Icons.people_rounded, cs.primary),
+                _buildStatCard(cs, 'Passes', widget.passes.length.toString(), Icons.group_rounded, cs.primary),
               ]),
             ],
           ),
@@ -300,10 +295,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildActionGrid(BuildContext context, ColorScheme cs, bool isWide) {
     final actions = [
-      _ActionItem(Icons.add_card_rounded, 'Issue Pass', 'Create new gate pass', cs.primary, () => widget.onNavigate(1)),
-      _ActionItem(Icons.qr_code_scanner_rounded, 'Scan QR', 'Verify at gate', cs.tertiary, () => widget.onNavigate(3)),
-      _ActionItem(Icons.file_download_rounded, 'Import', 'JSON / CSV files', cs.secondary, widget.onImport),
-      _ActionItem(Icons.upload_rounded, 'Export', 'Share pass data', cs.error, widget.onExport),
+      _ActionItem(Icons.note_add_rounded, 'Issue Pass', 'Create new gate pass', cs.primary, () => widget.onNavigate(1)),
+      _ActionItem(Icons.qr_code_2_rounded, 'Scan QR', 'Verify at gate', cs.tertiary, () => widget.onNavigate(3)),
+      _ActionItem(Icons.download_rounded, 'Import', 'JSON / CSV files', cs.secondary, widget.onImport),
+      _ActionItem(Icons.cloud_upload_rounded, 'Export', 'Share pass data', cs.error, widget.onExport),
     ];
 
     if (isWide) {
@@ -375,7 +370,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isEntry = log.action == 'ENTRY';
     final isReject = log.action == 'REJECTED';
     final color = isReject ? cs.error : (isEntry ? Colors.green : cs.tertiary);
-    final icon = isReject ? Icons.block_rounded : (isEntry ? Icons.login_rounded : Icons.logout_rounded);
+    final icon = isReject ? Icons.do_not_disturb_on_rounded : (isEntry ? Icons.door_front_door_rounded : Icons.exit_to_app_rounded);
     final statusLabel = log.scanStatus ?? (log.valid ? 'VALID' : 'INVALID');
 
     final delay = index * 60;
