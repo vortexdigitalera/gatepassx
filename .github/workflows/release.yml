@@ -135,29 +135,22 @@ jobs:
           echo "Keystore: ${ANDROID_KEYSTORE_PATH:-<none — debug signing>}"
 
           flutter build apk --release \
-            --split-per-abi \
             --build-name "$VERSION_NAME" \
             --build-number "$BUILD_NUMBER"
 
-          ls -lh build/app/outputs/flutter-apk/app-*-release.apk || echo "(no APKs found)"
+          ls -lh build/app/outputs/flutter-apk/app-release.apk || {
+            echo "::error::APK not found"
+            exit 1
+          }
 
       - name: Stage APK artifacts
         env:
           VERSION: ${{ needs.resolve-version.outputs.version }}
         run: |
           set -euo pipefail
-          OUTDIR="mobile/build/app/outputs/flutter-apk"
-          if ls "$OUTDIR"/app-*-release.apk >/dev/null 2>&1; then
-            for apk in "$OUTDIR"/app-*-release.apk; do
-              abi=$(echo "$apk" | sed -E 's/.*app-(.*)-release\.apk/\1/')
-              dest="gatepassx-android-${VERSION}-${abi}.apk"
-              cp "$apk" "$dest"
-              ls -lh "$dest"
-            done
-          else
-            cp "$OUTDIR/app-release.apk" "gatepassx-android-${VERSION}.apk"
-            ls -lh "gatepassx-android-${VERSION}.apk"
-          fi
+          cp "mobile/build/app/outputs/flutter-apk/app-release.apk" \
+             "gatepassx-android-${VERSION}.apk"
+          ls -lh "gatepassx-android-${VERSION}.apk"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
