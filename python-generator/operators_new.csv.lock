@@ -1,0 +1,8 @@
+{
+  "input_file": "operators_new.csv",
+  "input_hash": "199a102e0ecd8b48253e79575c3f3f489f1c19cc9509c5ede01c647bb011c02d",
+  "output_dir": "outputdir/passes_new",
+  "pass_count": 36,
+  "generated_at": "2026-06-23T16:44:45.935044",
+  "generator_version": "1.0.0"
+}

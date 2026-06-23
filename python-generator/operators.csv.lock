@@ -1,0 +1,8 @@
+{
+  "input_file": "operators.csv",
+  "input_hash": "fed24b7446a51ebaf4077da356431962fab6adf5481d11626602080376acd684",
+  "output_dir": "outputdir/passes",
+  "pass_count": 134,
+  "generated_at": "2026-06-23T16:46:12.022727",
+  "generator_version": "1.0.0"
+}
