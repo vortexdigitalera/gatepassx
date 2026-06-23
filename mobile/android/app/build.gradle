@@ -51,8 +51,20 @@ android {
 
     signingConfigs {
         release {
-            // Fields populated after this block via configureReleaseSigning if credentials exist.
-            // We always declare it so buildTypes.release can reference signingConfigs.release.
+            def cfg = configureReleaseSigning()
+            if (cfg != null) {
+                storeFile = cfg.storeFile
+                storePassword = cfg.storePassword
+                keyAlias = cfg.keyAlias
+                keyPassword = cfg.keyPassword
+                println "GatePassX: RELEASE signing key enabled from env/key.properties"
+            } else {
+                storeFile = signingConfigs.debug.storeFile
+                storePassword = signingConfigs.debug.storePassword
+                keyAlias = signingConfigs.debug.keyAlias
+                keyPassword = signingConfigs.debug.keyPassword
+                println "GatePassX: no RELEASE signing — using debug (local only)"
+            }
         }
     }
 
@@ -65,20 +77,4 @@ android {
 
 flutter {
     source = "../.."
-}
-
-// === Apply real RELEASE signing key (or fallback to debug for local builds) ===
-def releaseConfig = configureReleaseSigning()
-if (releaseConfig != null) {
-    android.signingConfigs.release.storeFile = releaseConfig.storeFile
-    android.signingConfigs.release.storePassword = releaseConfig.storePassword
-    android.signingConfigs.release.keyAlias = releaseConfig.keyAlias
-    android.signingConfigs.release.keyPassword = releaseConfig.keyPassword
-    println "GatePassX: RELEASE signing ENABLED (using provided keystore)"
-} else {
-    android.signingConfigs.release.storeFile = android.signingConfigs.debug.storeFile
-    android.signingConfigs.release.storePassword = android.signingConfigs.debug.storePassword
-    android.signingConfigs.release.keyAlias = android.signingConfigs.debug.keyAlias
-    android.signingConfigs.release.keyPassword = android.signingConfigs.debug.keyPassword
-    println "GatePassX: no RELEASE signing key — falling back to debug signing"
 }
