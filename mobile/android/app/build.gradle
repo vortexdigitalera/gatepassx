@@ -24,7 +24,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace = "com.ahuon.gatepassx.gatepassx"
+    namespace = "com.rabyte.gpxadmin"
     // Use *Version suffix for better compatibility with some plugins (share_plus etc.)
     // Bump for mobile_scanner which requires Android SDK 36+
     compileSdkVersion Math.max(flutter.compileSdkVersion ?: 34, 36)
@@ -41,13 +41,13 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.ahuon.gatepassx.gatepassx"
+        applicationId = "com.rabyte.gpxadmin"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         minSdkVersion flutter.minSdkVersion ?: 21
         targetSdkVersion flutter.targetSdkVersion ?: 36
         versionCode = flutterVersionCode.toInteger()
-        versionName = flutterVersionName
+        versionName = "2026.07.22"
     }
 
     buildTypes {
