@@ -136,10 +136,10 @@ Or go to **Actions → "Build and Release" → Run workflow** (manual).
 
 The workflow will produce and attach to the GitHub Release:
 
-- `gatepassx-android-vX.Y.Z.apk` — Flutter Android release build (all caches built in /tmp on the runner)
+- `gatepassx-android-vX.Y.Z.apk` — Flutter Android release build
 - `gatepassx-python-generator-vX.Y.Z.zip` — Self-contained Python generator tool (with requirements + samples)
 
-See [.github/workflows/release.yml](.github/workflows/release.yml) for details. All CI builds also force Gradle + Pub + Flutter build outputs into temp storage.
+See [.github/workflows/release.yml](.github/workflows/release.yml) for details. Android and Python packaging run in parallel; Gradle and pub dependencies are cached on the runner.
 
 **Important: RELEASE signing key (not debug)**
 
