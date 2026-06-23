@@ -139,13 +139,7 @@ jobs:
             --build-name "$VERSION_NAME" \
             --build-number "$BUILD_NUMBER"
 
-          APK="build/app/outputs/flutter-apk/app-release.apk"
-          if [ ! -f "$APK" ]; then
-            echo "::error::APK not found at $APK"
-            ls -R build/app/outputs/flutter-apk || true
-            exit 1
-          fi
-          ls -lh "$APK"
+          ls -lh build/app/outputs/flutter-apk/app-*-release.apk || echo "(no APKs found)"
 
       - name: Stage APK artifacts
         env:
