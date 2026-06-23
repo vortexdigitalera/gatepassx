@@ -4,6 +4,8 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+apply from: rootProject.file("signing.gradle")
+
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
@@ -24,8 +26,8 @@ if (flutterVersionName == null) {
 
 android {
     namespace = "com.rabyte.gpxadmin"
-    compileSdkVersion Math.max(flutter.compileSdkVersion ?: 34, 36)
-    ndkVersion = flutter.ndkVersion ?: "25.1.8937393"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -33,20 +35,39 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = '17'
+        jvmTarget = JavaVersion.VERSION_17
     }
 
     defaultConfig {
         applicationId = "com.rabyte.gpxadmin"
-        minSdkVersion flutter.minSdkVersion ?: 21
-        targetSdkVersion flutter.targetSdkVersion ?: 36
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
         versionCode = flutterVersionCode.toInteger()
-        versionName = "2026.07.22"
+        versionName = flutterVersionName
+    }
+
+    signingConfigs {
+        release {
+            def cfg = configureReleaseSigning()
+            if (cfg != null) {
+                storeFile = cfg.storeFile
+                storePassword = cfg.storePassword
+                keyAlias = cfg.keyAlias
+                keyPassword = cfg.keyPassword
+                println "GatePassX: RELEASE signing key enabled from env/key.properties"
+            } else {
+                storeFile = signingConfigs.debug.storeFile
+                storePassword = signingConfigs.debug.storePassword
+                keyAlias = signingConfigs.debug.keyAlias
+                keyPassword = signingConfigs.debug.keyPassword
+                println "GatePassX: no RELEASE signing — using debug (local only)"
+            }
+        }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.release
         }
     }
 }

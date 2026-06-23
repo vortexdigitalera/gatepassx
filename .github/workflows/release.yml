@@ -12,11 +12,11 @@ on:
         default: ''
 
 env:
-  FLUTTER_VERSION: '3.22.2'
+  FLUTTER_VERSION: '3.29.0'
 
 jobs:
   build-and-release:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: write
 
@@ -26,7 +26,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # === Determine version very early ===
       - name: Determine version
         id: version
         env:
@@ -48,14 +47,12 @@ jobs:
           echo "clean_version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
           echo "Using version: $VERSION (clean: $CLEAN_VERSION)"
 
-      # === Setup Java (required for Android builds) ===
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
-      # === Flutter ===
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -63,125 +60,61 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # Use dedicated Android setup action + explicit caching.
-      # This is more reliable for license acceptance and avoids the "Fetch remote repository" hangs
-      # that happen when flutter doctor tries to auto-update SDK.
-      - name: Cache Android SDK
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.android
-            /opt/hostedtoolcache/android
-            /usr/local/lib/android
-          key: ${{ runner.os }}-android-sdk-${{ hashFiles('mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-android-sdk-
-
-
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: wrapper
-          cache-disabled: true
-
-      - name: Clean Gradle jars cache after restore (fix bcprov creation)
-        run: |
-          export GRADLE_USER_HOME="${{ runner.temp }}/.gradle"
-          rm -rf "$GRADLE_USER_HOME/caches/jars-"* 2>/dev/null || true
-          rm -rf "$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle" 2>/dev/null || true
-          echo "Cleaned jars caches"
-
-      - name: Pre-accept SDK licenses (early hack to avoid fetch/compute hangs)
-        run: |
-          # Pre-write to user-writable locations before the action installs.
-          # This helps the action's internal sdkmanager not complain.
-          for SDK_DIR in "$HOME/Android/Sdk" "$HOME/.android"; do
-            mkdir -p "$SDK_DIR/licenses" 2>/dev/null || true
-            echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > "$SDK_DIR/licenses/android-sdk-license" || true
-            echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > "$SDK_DIR/licenses/android-sdk-license" || true
-            echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$SDK_DIR/licenses/android-sdk-license" || true
-            echo "79120722343a6f314e0719f863036c702b0e6b2a" > "$SDK_DIR/licenses/android-sdk-license" || true
-            echo "33b6a2b64607f11b759f320ef9c38d4d" > "$SDK_DIR/licenses/google-gdk-license" || true
-            echo "d975f751698a77b662f1254ddbeed3901e976f5a" > "$SDK_DIR/licenses/intel-android-extra-license" || true
-            echo "84831b9409646a918e30573bab4c9c91346d8abd" > "$SDK_DIR/licenses/android-sdk-preview-license" || true
-          done
-          echo "Licenses pre-accepted in writable locations."
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          # Use a recent cmdline-tools to avoid old license fetch issues
-          cmdline-tools-version: '11076708'
 
       - name: Accept Android SDK licenses
-        run: |
-          # Make sure $ANDROID_HOME is set (the action should have set it)
-          ANDROID_HOME=${ANDROID_HOME:-$HOME/Android/Sdk}
-          export ANDROID_HOME
-          echo "Using ANDROID_HOME=$ANDROID_HOME"
-          # Write the license files directly to the correct location (this satisfies most checks)
-          mkdir -p "$ANDROID_HOME/licenses"
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > "$ANDROID_HOME/licenses/android-sdk-license"
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > "$ANDROID_HOME/licenses/android-sdk-license"
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license"
-          echo "79120722343a6f314e0719f863036c702b0e6b2a" > "$ANDROID_HOME/licenses/android-sdk-license"
-          echo "84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
-          echo "33b6a2b64607f11b759f320ef9c38d4d" > "$ANDROID_HOME/licenses/google-gdk-license"
-          echo "d975f751698a77b662f1254ddbeed3901e976f5a" > "$ANDROID_HOME/licenses/intel-android-extra-license"
-          # Now run the acceptance commands with yes to catch any remaining
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          yes | flutter doctor --android-licenses || true
-          flutter doctor -v | cat
+        run: yes | flutter doctor --android-licenses
 
-      # === Python ===
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # === Prepare caches (use $RUNNER_TEMP for Gradle - runner temp dir, not /tmp) ===
-      - name: Prepare caches
+      - name: Prepare Android RELEASE signing key
+        id: signing
         env:
-          RUNNER_TEMP: ${{ runner.temp }}
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 || secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS || secrets.ANDROID_KEY_ALIAS || 'upload' }}
+          KEY_PASS: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD || secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          export PUB_CACHE="${HOME}/.pub-cache"
-          mkdir -p "$PUB_CACHE"
-          echo "Pub cache: $PUB_CACHE"
-          echo "Disk:"; df -h . || true
+          set -e
+          SIGNING_DIR="${RUNNER_TEMP}/signing"
+          mkdir -p "$SIGNING_DIR"
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$SIGNING_DIR/release-keystore.jks"
+            chmod 600 "$SIGNING_DIR/release-keystore.jks"
+            {
+              echo "ANDROID_KEYSTORE_PATH=$SIGNING_DIR/release-keystore.jks"
+              echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASS"
+              echo "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+              echo "ANDROID_KEY_PASSWORD=$KEY_PASS"
+            } >> $GITHUB_ENV
+            echo "keystore_prepared=true" >> $GITHUB_OUTPUT
+            echo "RELEASE signing key prepared from secrets."
+          else
+            echo "keystore_prepared=false" >> $GITHUB_OUTPUT
+            echo "::warning::No release keystore secret configured — build will use debug signing."
+          fi
 
-      # ==================== FLUTTER ANDROID ====================
       - name: Get Flutter dependencies
         working-directory: mobile
         run: flutter pub get
 
-      - name: Build Android APK (release) - using debug key
+      - name: Build Android APK (release)
         working-directory: mobile
         env:
           VERSION_NAME: ${{ steps.version.outputs.clean_version }}
           BUILD_NUMBER: ${{ github.run_number }}
+          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEYSTORE_PATH || '' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEYSTORE_PASSWORD || '' }}
+          ANDROID_KEY_ALIAS: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEY_ALIAS || '' }}
+          ANDROID_KEY_PASSWORD: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEY_PASSWORD || '' }}
         run: |
           set -e
-          echo "Building APK versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER (using debug key)"
-
-          # Use default Gradle home on system disk (runner.temp filesystem may cause jar creation issues)
-          export GRADLE_USER_HOME="${HOME}/.gradle-ci"
-          rm -rf "$GRADLE_USER_HOME"
-          mkdir -p "$GRADLE_USER_HOME"
-
-          # macOS runner has different SDK path
-          if [ "$(uname)" = "Darwin" ]; then
-            export ANDROID_HOME="${HOME}/Library/Android/sdk"
-            export ANDROID_SDK_ROOT="${HOME}/Library/Android/sdk"
-            export PUB_CACHE="${HOME}/.pub-cache"
-          else
-            export ANDROID_HOME="/usr/local/lib/android/sdk"
-            export ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
-            export PUB_CACHE="${HOME}/.pub-cache"
-          fi
-
-          flutter clean
-          flutter pub get
+          echo "Building APK versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
+          echo "Keystore: ${ANDROID_KEYSTORE_PATH:-<none>}"
 
           flutter build apk --release \
             --build-name "$VERSION_NAME" \
@@ -201,12 +134,10 @@ jobs:
           set -e
           APK_SRC="build/app/outputs/flutter-apk/app-release.apk"
           APK_DEST="../gatepassx-android-${VERSION}.apk"
-
           cp "$APK_SRC" "$APK_DEST"
           ls -lh "$APK_DEST"
           echo "artifact_apk=$APK_DEST" >> $GITHUB_ENV
 
-      # ==================== PYTHON GENERATOR ====================
       - name: Package Python Generator
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -214,40 +145,28 @@ jobs:
           set -e
           PKG_DIR="gatepassx-python-generator-${VERSION}"
           mkdir -p "$PKG_DIR"
-
-          # Copy the generator source
           cp -r python-generator/* "$PKG_DIR"/
           cp -r sample_data "$PKG_DIR"/ 2>/dev/null || true
-
-          # Use the dedicated release readme (avoids heredoc issues in YAML)
           if [ -f python-generator/RELEASE_README.txt ]; then
             cp python-generator/RELEASE_README.txt "$PKG_DIR/README.txt"
           fi
-
-          # Create zip
           ZIP_NAME="gatepassx-python-generator-${VERSION}.zip"
           zip -r "$ZIP_NAME" "$PKG_DIR"
           ls -lh "$ZIP_NAME"
-
           echo "artifact_python_zip=$ZIP_NAME" >> $GITHUB_ENV
 
-      # ==================== RELEASE ====================
       - name: Create and upload GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -e
-          echo "Creating release for $VERSION"
-
           gh release create "$VERSION" \
             --title "GatePassX $VERSION" \
             --generate-notes \
             --draft=false \
             gatepassx-android-*.apk \
             gatepassx-python-generator-*.zip
-
-          echo "Release created and artifacts attached successfully."
 
       - name: Upload build artifacts (debug)
         uses: actions/upload-artifact@v4

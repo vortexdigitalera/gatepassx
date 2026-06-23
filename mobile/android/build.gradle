@@ -1,39 +1,13 @@
-// Provide 'flutter' extension early so that plugins (share_plus, mobile_scanner etc.)
-// can access flutter.compileSdkVersion etc. during their evaluation.
-// This fixes "unknown property 'flutter'" and "compileSdkVersion not specified" errors.
-ext.flutter = [
-    compileSdkVersion: 36,
-    minSdkVersion: 21,
-    targetSdkVersion: 36,
-    ndkVersion: "25.1.8937393"
-]
-
-ext.kotlin_version = '1.9.10'
-
-// Force consistent Kotlin version 
 allprojects {
     repositories {
         google()
         mavenCentral()
-    }
-    configurations.all {
-        resolutionStrategy {
-            force "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
-            force "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
-            force "org.bouncycastle:bcprov-jdk18on:1.78"
-            force "org.bouncycastle:bcprov-jdk15to18:1.78"
-        }
     }
 }
 
 rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(":app")
 }
 
 tasks.register("clean", Delete) {
