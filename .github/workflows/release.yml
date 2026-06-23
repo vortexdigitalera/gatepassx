@@ -79,12 +79,13 @@ jobs:
 
 
 
-      - name: Setup Gradle
+      - name: Setup Gradle (no cache — runner.temp is fresh per run, avoids corrupt jar restore)
         uses: gradle/actions/setup-gradle@v4
         env:
           GRADLE_USER_HOME: ${{ runner.temp }}/.gradle
         with:
           gradle-version: wrapper
+          cache-disabled: true
 
       - name: Pre-accept SDK licenses (early hack to avoid fetch/compute hangs)
         run: |
