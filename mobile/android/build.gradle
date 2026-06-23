@@ -8,20 +8,9 @@ ext.flutter = [
     ndkVersion: "25.1.8937393"
 ]
 
-buildscript {
-    def kotlin_version = '2.1.0'
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
-}
+ext.kotlin_version = '1.9.10'
 
-ext.kotlin_version = '2.1.0'  // expose to project scope for allprojects and resolutionStrategy
-
-// Force consistent Kotlin version to avoid conflicts with plugins that pull different stdlib (e.g. mobile_scanner 2.1)
+// Force consistent Kotlin version 
 allprojects {
     repositories {
         google()

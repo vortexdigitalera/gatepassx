@@ -74,6 +74,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-android-sdk-
 
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle-wrapper.properties', '**/*.gradle*', '**/gradle.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Pre-accept SDK licenses (early hack to avoid fetch/compute hangs)
         run: |
           # Pre-write to user-writable locations before the action installs.
@@ -122,15 +132,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      # === Temp cache directories (important for disk) ===
-      - name: Prepare build caches in /tmp
+      # === Prepare caches (use default locations for Gradle to avoid /tmp issues) ===
+      - name: Prepare caches
         run: |
-          export GRADLE_USER_HOME=/tmp/.gradle
-          export PUB_CACHE=/tmp/.pub-cache
-
-          mkdir -p "$GRADLE_USER_HOME" "$PUB_CACHE"
-          echo "Gradle cache: $GRADLE_USER_HOME"
-          echo "Pub cache:    $PUB_CACHE"
+          export PUB_CACHE=/home/runner/.pub-cache
+          mkdir -p "$PUB_CACHE"
+          echo "Pub cache: $PUB_CACHE"
           df -h /tmp
 
       # ==================== FLUTTER ANDROID ====================
@@ -141,8 +148,7 @@ jobs:
       - name: Build Android APK (release)
         working-directory: mobile
         env:
-          GRADLE_USER_HOME: /tmp/.gradle
-          PUB_CACHE: /tmp/.pub-cache
+          PUB_CACHE: /home/runner/.pub-cache
           ANDROID_HOME: /usr/local/lib/android/sdk
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
