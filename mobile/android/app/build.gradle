@@ -68,21 +68,17 @@ flutter {
 }
 
 // === Apply real RELEASE signing key (or fallback to debug for local builds) ===
-// This runs after android block so we can safely mutate signingConfigs.release.
 def releaseConfig = configureReleaseSigning()
 if (releaseConfig != null) {
-    signingConfigs.release.storeFile = releaseConfig.storeFile
-    signingConfigs.release.storePassword = releaseConfig.storePassword
-    signingConfigs.release.keyAlias = releaseConfig.keyAlias
-    signingConfigs.release.keyPassword = releaseConfig.keyPassword
+    android.signingConfigs.release.storeFile = releaseConfig.storeFile
+    android.signingConfigs.release.storePassword = releaseConfig.storePassword
+    android.signingConfigs.release.keyAlias = releaseConfig.keyAlias
+    android.signingConfigs.release.keyPassword = releaseConfig.keyPassword
     println "GatePassX: RELEASE signing ENABLED (using provided keystore)"
 } else {
-    // Fallback copies debug values so release variant builds without error.
-    // The resulting APK will be debug-signed (acceptable for sideloading tests).
-    // For production releases the CI workflow MUST supply the signing secrets.
-    signingConfigs.release.storeFile = signingConfigs.debug.storeFile
-    signingConfigs.release.storePassword = signingConfigs.debug.storePassword
-    signingConfigs.release.keyAlias = signingConfigs.debug.keyAlias
-    signingConfigs.release.keyPassword = signingConfigs.debug.keyPassword
-    println "GatePassX: RELEASE signing NOT configured — falling back to debug key for this build"
+    android.signingConfigs.release.storeFile = android.signingConfigs.debug.storeFile
+    android.signingConfigs.release.storePassword = android.signingConfigs.debug.storePassword
+    android.signingConfigs.release.keyAlias = android.signingConfigs.debug.keyAlias
+    android.signingConfigs.release.keyPassword = android.signingConfigs.debug.keyPassword
+    println "GatePassX: no RELEASE signing key — falling back to debug signing"
 }
