@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -16,11 +17,16 @@ import 'screens/scanner_screen.dart';
 import 'screens/logs_screen.dart';
 
 const _fallbackSeed = Color(0xFF1A1A2E);
+final _interFont = GoogleFonts.inter().fontFamily!;
 
 ThemeData _buildTheme(ColorScheme scheme) {
+  final textTheme = GoogleFonts.interTextTheme(ThemeData(brightness: scheme.brightness).textTheme);
+
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
+    textTheme: textTheme,
+    fontFamily: _interFont,
     scaffoldBackgroundColor: scheme.surfaceContainerLowest,
     appBarTheme: AppBarTheme(
       elevation: 0,
@@ -29,7 +35,7 @@ ThemeData _buildTheme(ColorScheme scheme) {
       backgroundColor: scheme.primary,
       foregroundColor: scheme.onPrimary,
       iconTheme: const IconThemeData(size: 26),
-      titleTextStyle: TextStyle(
+      titleTextStyle: GoogleFonts.inter(
         color: scheme.onPrimary,
         fontSize: 18,
         fontWeight: FontWeight.w700,
@@ -79,9 +85,9 @@ ThemeData _buildTheme(ColorScheme scheme) {
       }),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
-          return TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurface);
+          return GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurface);
         }
-        return TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant);
+        return GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant);
       }),
     ),
     snackBarTheme: SnackBarThemeData(
@@ -96,14 +102,14 @@ ThemeData _buildTheme(ColorScheme scheme) {
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
         minimumSize: const Size(0, 52),
       ),
     ),
@@ -111,7 +117,7 @@ ThemeData _buildTheme(ColorScheme scheme) {
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
         minimumSize: const Size(0, 52),
       ),
     ),
@@ -134,7 +140,7 @@ ThemeData _buildTheme(ColorScheme scheme) {
       shape: WidgetStatePropertyAll(
         RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 15)),
+      textStyle: WidgetStatePropertyAll(GoogleFonts.inter(fontSize: 15)),
     ),
     iconTheme: IconThemeData(size: 26, color: scheme.onSurfaceVariant),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -309,8 +315,8 @@ class _GatePassHomeState extends State<GatePassHome> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('DePass', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: cs.onPrimary, letterSpacing: 0.3)),
-                        Text('EVENT GATE PASS', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w400, letterSpacing: 1.8, color: cs.onPrimary.withValues(alpha: 0.65))),
+                        Text('DePass', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: cs.onPrimary, letterSpacing: 0.3)),
+                        Text('EVENT GATE PASS', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w500, letterSpacing: 1.8, color: cs.onPrimary.withValues(alpha: 0.65))),
                       ],
                     ),
                   ],
@@ -362,11 +368,12 @@ class _GatePassHomeState extends State<GatePassHome> {
                       onExport: _exportAll,
                     ),
                     IssuePassScreen(onSave: _savePass),
-                    PassesScreen(passes: _passes, onAddLog: _addLog),
+                    PassesScreen(passes: _passes, onAddLog: _addLog, onUpdatePass: _savePass),
                     ScannerScreen(
                       onAddLog: _addLog,
                       knownPasses: _passes,
                       onBack: () => _onTabChange(0),
+                      onUpdatePass: _savePass,
                     ),
                     LogsScreen(logs: _logs),
                   ],
@@ -417,7 +424,7 @@ class _GatePassHomeState extends State<GatePassHome> {
             ? FloatingActionButton.extended(
                 onPressed: () => _onTabChange(1),
                 icon: const Icon(Icons.add_rounded, size: 24),
-                label: const Text('New Pass', style: TextStyle(fontWeight: FontWeight.w600)),
+                label: Text('New Pass', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
               )
             : null,
       ),

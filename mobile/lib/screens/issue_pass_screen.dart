@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -253,7 +254,7 @@ class _IssuePassScreenState extends State<IssuePassScreen> with SingleTickerProv
               child: Icon(icon, size: 16, color: cs.primary),
             ),
             const SizedBox(width: 10),
-            Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cs.onSurfaceVariant, letterSpacing: 0.5)),
+            Text(title, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: cs.onSurfaceVariant, letterSpacing: 0.5)),
           ],
         ),
         const SizedBox(height: 12),
@@ -282,7 +283,7 @@ class _IssuePassScreenState extends State<IssuePassScreen> with SingleTickerProv
               children: [
                 Text(label, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 2),
-                Text(DateFormat('dd MMM yyyy').format(date), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                Text(DateFormat('dd MMM yyyy').format(date), style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600)),
               ],
             ),
           ],
@@ -322,7 +323,7 @@ class _IssuePassScreenState extends State<IssuePassScreen> with SingleTickerProv
                 const SizedBox(height: 12),
                 Text(_generatedPass!.eventName, style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
                 const SizedBox(height: 4),
-                Text(_generatedPass!.fullName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                Text(_generatedPass!.fullName, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800)),
                 Text(_generatedPass!.idNumber, style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
                 if (_generatedPass!.tableNumber != null) ...[
                   const SizedBox(height: 6),

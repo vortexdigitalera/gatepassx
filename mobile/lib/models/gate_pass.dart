@@ -6,6 +6,14 @@ import 'package:intl/intl.dart';
 enum PassCategory { GUEST, VIP, STAFF, SPEAKER, PERFORMER, MEDIA, VENDOR, EXHIBITOR }
 enum EventType { DINNER, GALA, CONFERENCE, WEDDING, CONCERT, FESTIVAL, EXHIBITION, CORPORATE, PRIVATE_PARTY, OTHER }
 
+enum PassScanStatus {
+  valid,
+  notStarted,
+  expired,
+  duplicate,
+  unknown,
+}
+
 class GatePass {
   final String passId;
   final String eventName;
@@ -24,6 +32,7 @@ class GatePass {
   final DateTime issuedAt;
   final String issuedBy;
   String? qrPayload;
+  DateTime? lastScannedAt;
 
   GatePass({
     required this.passId,
@@ -42,10 +51,49 @@ class GatePass {
     this.groupRef,
     DateTime? issuedAt,
     this.issuedBy = 'GatePassX',
+    this.lastScannedAt,
   }) : issuedAt = issuedAt ?? DateTime.now();
 
   String get formattedValidity =>
       '${DateFormat.yMd().format(validFrom)} → ${DateFormat.yMd().format(validTo)}';
+
+  /// Whether the pass validity window is currently active.
+  bool get isActive {
+    final now = DateTime.now();
+    return !now.isBefore(validFrom) && !now.isAfter(validTo);
+  }
+
+  /// Whether the event hasn't started yet.
+  bool get isNotStarted => DateTime.now().isBefore(validFrom);
+
+  /// Whether the pass has expired.
+  bool get isExpired => DateTime.now().isAfter(validTo);
+
+  /// Whether this pass was already scanned today.
+  bool get scannedToday {
+    if (lastScannedAt == null) return false;
+    final now = DateTime.now();
+    return lastScannedAt!.year == now.year &&
+        lastScannedAt!.month == now.month &&
+        lastScannedAt!.day == now.day;
+  }
+
+  /// Compute the scan status for this known pass.
+  PassScanStatus computeScanStatus() {
+    final now = DateTime.now();
+    if (now.isBefore(validFrom)) return PassScanStatus.notStarted;
+    if (now.isAfter(validTo)) return PassScanStatus.expired;
+    if (scannedToday) return PassScanStatus.duplicate;
+    return PassScanStatus.valid;
+  }
+
+  /// Human-readable status label for display.
+  String get statusLabel {
+    if (isNotStarted) return 'NOT STARTED';
+    if (isExpired) return 'EXPIRED';
+    if (scannedToday) return 'SCANNED';
+    return 'VALID';
+  }
 
   Map<String, dynamic> toVerificationMap() {
     final map = {
@@ -94,6 +142,7 @@ class GatePass {
         'issued_at': issuedAt.toIso8601String(),
         'issued_by': issuedBy,
         'qr_payload': qrPayload,
+        'last_scanned_at': lastScannedAt?.toIso8601String(),
       };
 
   factory GatePass.fromJson(Map<String, dynamic> json) {
@@ -102,7 +151,6 @@ class GatePass {
     final catStr = norm(json['category'] ?? json['cat'] ?? 'GUEST');
     final etStr = norm(json['event_type'] ?? json['eventType'] ?? json['trip_type'] ?? 'DINNER');
 
-    // Legacy field mapping: operator → organizer
     final organizer = json['organizer'] ?? json['operator'] ?? json['org'] ?? 'Unknown';
 
     return GatePass(
@@ -126,6 +174,7 @@ class GatePass {
       groupRef: json['group_ref'] ?? json['grp'],
       issuedAt: json['issued_at'] != null ? DateTime.tryParse(json['issued_at']) : null,
       issuedBy: json['issued_by'] ?? 'GatePassX',
+      lastScannedAt: json['last_scanned_at'] != null ? DateTime.tryParse(json['last_scanned_at']) : null,
     )..qrPayload = json['qr_payload'];
   }
 }
@@ -133,11 +182,12 @@ class GatePass {
 class PassLog {
   final DateTime timestamp;
   final String passId;
-  final String action; // ENTRY, EXIT, REJECTED
+  final String action;
   final String? gate;
   final String? scannedBy;
   final bool valid;
   final String? notes;
+  final String? scanStatus;
 
   PassLog({
     required this.passId,
@@ -146,6 +196,7 @@ class PassLog {
     this.scannedBy,
     this.valid = true,
     this.notes,
+    this.scanStatus,
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
 
@@ -157,6 +208,7 @@ class PassLog {
         'scanned_by': scannedBy,
         'valid': valid,
         'notes': notes,
+        'scan_status': scanStatus,
       };
 
   factory PassLog.fromJson(Map<String, dynamic> json) => PassLog(
@@ -166,6 +218,7 @@ class PassLog {
         scannedBy: json['scanned_by'],
         valid: json['valid'] ?? true,
         notes: json['notes'],
+        scanStatus: json['scan_status'],
         timestamp: DateTime.tryParse(json['timestamp'] ?? '') ?? DateTime.now(),
       );
 }

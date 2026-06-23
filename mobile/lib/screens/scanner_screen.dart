@@ -1,21 +1,35 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:intl/intl.dart';
 import '../models/gate_pass.dart';
 
+class ScanResult {
+  final PassScanStatus status;
+  final GatePass? match;
+  final String pid;
+  final String reason;
+
+  const ScanResult({required this.status, required this.match, required this.pid, required this.reason});
+
+  bool get isGranted => status == PassScanStatus.valid || status == PassScanStatus.duplicate;
+}
+
 class ScannerScreen extends StatefulWidget {
   final Future<void> Function(PassLog) onAddLog;
   final List<GatePass> knownPasses;
   final VoidCallback onBack;
+  final Future<void> Function(GatePass) onUpdatePass;
 
   const ScannerScreen({
     super.key,
     required this.onAddLog,
     required this.knownPasses,
     required this.onBack,
+    required this.onUpdatePass,
   });
 
   @override
@@ -74,9 +88,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     } catch (_) {}
   }
 
-  void _handleScan(String payload) {
-    _processing = true;
-
+  ScanResult _evaluateScan(String payload) {
     Map<String, dynamic>? data;
     try {
       data = jsonDecode(payload);
@@ -93,32 +105,70 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       }
     }
 
-    final now = DateTime.now();
-    bool valid = true;
-    String reason = 'OK';
-
-    if (match != null) {
-      if (now.isBefore(match.validFrom) || now.isAfter(match.validTo)) {
-        valid = false;
-        reason = 'EXPIRED / NOT YET VALID';
-      }
-    } else {
-      reason = 'UNKNOWN PASS';
+    if (match == null) {
+      return ScanResult(status: PassScanStatus.unknown, match: null, pid: pid, reason: 'Pass not found in system');
     }
 
-    final log = PassLog(
-      passId: pid,
-      action: valid ? 'ENTRY' : 'REJECTED',
-      valid: valid,
-      notes: reason,
-    );
-    widget.onAddLog(log);
-    _playFeedback(valid);
+    final status = match.computeScanStatus();
+    String reason;
+    switch (status) {
+      case PassScanStatus.valid:
+        reason = 'OK';
+      case PassScanStatus.notStarted:
+        final diff = match.validFrom.difference(DateTime.now());
+        if (diff.inDays > 0) {
+          reason = 'Event starts in ${diff.inDays} day${diff.inDays > 1 ? 's' : ''}';
+        } else if (diff.inHours > 0) {
+          reason = 'Event starts in ${diff.inHours}h ${diff.inMinutes % 60}m';
+        } else {
+          reason = 'Event starts in ${diff.inMinutes} minutes';
+        }
+      case PassScanStatus.expired:
+        final diff = DateTime.now().difference(match.validTo);
+        if (diff.inDays > 0) {
+          reason = 'Expired ${diff.inDays} day${diff.inDays > 1 ? 's' : ''} ago';
+        } else if (diff.inHours > 0) {
+          reason = 'Expired ${diff.inHours}h ago';
+        } else {
+          reason = 'Expired ${diff.inMinutes} minutes ago';
+        }
+      case PassScanStatus.duplicate:
+        final scannedAgo = DateTime.now().difference(match.lastScannedAt!);
+        reason = 'Already scanned ${scannedAgo.inMinutes}m ago at ${DateFormat.jm().format(match.lastScannedAt!)}';
+      case PassScanStatus.unknown:
+        reason = 'Unknown status';
+    }
 
-    if (mounted) _showResult(valid, reason, match, pid);
+    return ScanResult(status: status, match: match, pid: pid, reason: reason);
   }
 
-  void _showResult(bool valid, String reason, GatePass? match, String pid) {
+  void _handleScan(String payload) {
+    _processing = true;
+    final result = _evaluateScan(payload);
+
+    final isGranted = result.isGranted;
+    _playFeedback(isGranted);
+
+    // Log the scan
+    final log = PassLog(
+      passId: result.pid,
+      action: isGranted ? 'ENTRY' : 'REJECTED',
+      valid: isGranted,
+      notes: result.reason,
+      scanStatus: result.status.name,
+    );
+    widget.onAddLog(log);
+
+    // Update lastScannedAt for valid/duplicate scans
+    if (result.match != null && (result.status == PassScanStatus.valid || result.status == PassScanStatus.duplicate)) {
+      result.match!.lastScannedAt = DateTime.now();
+      widget.onUpdatePass(result.match!);
+    }
+
+    if (mounted) _showResult(result);
+  }
+
+  void _showResult(ScanResult result) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -128,10 +178,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
         duration: const Duration(milliseconds: 400),
       ),
       builder: (ctx) => _ResultSheet(
-        valid: valid,
-        reason: reason,
-        match: match,
-        pid: pid,
+        result: result,
         onScanAgain: () {
           Navigator.pop(ctx);
           setState(() => _processing = false);
@@ -187,18 +234,13 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
                     child: Center(child: CircularProgressIndicator(color: Colors.white)),
                   ),
                 ),
-
-                // Top header with back button
                 Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
+                  top: 0, left: 0, right: 0,
                   child: SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       child: Row(
                         children: [
-                          // Back button
                           _buildGlassButton(
                             onTap: widget.onBack,
                             child: Row(
@@ -208,12 +250,11 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
                                 const SizedBox(width: 6),
                                 Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 18),
                                 const SizedBox(width: 6),
-                                const Text('SCANNER', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                                Text('SCANNER', style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
                               ],
                             ),
                           ),
                           const Spacer(),
-                          // Torch toggle
                           ValueListenableBuilder<MobileScannerState>(
                             valueListenable: _controller,
                             builder: (ctx, state, _) {
@@ -241,11 +282,8 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
                     ),
                   ),
                 ),
-
-                // Instruction text
                 Positioned(
-                  left: 0,
-                  right: 0,
+                  left: 0, right: 0,
                   top: top + scanSize + 24,
                   child: Center(
                     child: Container(
@@ -254,25 +292,16 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
                         color: Colors.black.withValues(alpha: 0.35),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(
-                        'Point camera at QR code',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w500),
-                      ),
+                      child: Text('Point camera at QR code', style: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w500)),
                     ),
                   ),
                 ),
-
-                // Paste field at bottom
                 Positioned(
-                  left: 16,
-                  right: 16,
+                  left: 16, right: 16,
                   bottom: MediaQuery.of(context).padding.bottom + 16,
                   child: _buildPasteField(cs),
                 ),
-
-                // Processing overlay
-                if (_processing)
-                  Container(color: Colors.black.withValues(alpha: 0.5)),
+                if (_processing) Container(color: Colors.black.withValues(alpha: 0.5)),
               ],
             ),
           );
@@ -304,10 +333,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     final rect = _scanRect!;
     return Stack(
       children: [
-        CustomPaint(
-          size: cons.biggest,
-          painter: _OverlayPainter(rect, cs),
-        ),
+        CustomPaint(size: cons.biggest, painter: _OverlayPainter(rect, cs)),
         AnimatedBuilder(
           animation: _scanLineAnim,
           builder: (ctx, _) => Positioned(
@@ -317,15 +343,13 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
               width: rect.width - 12,
               height: 2,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    cs.primary.withValues(alpha: 0.9),
-                    cs.tertiary.withValues(alpha: 0.9),
-                    cs.primary.withValues(alpha: 0.9),
-                    Colors.transparent,
-                  ],
-                ),
+                gradient: LinearGradient(colors: [
+                  Colors.transparent,
+                  cs.primary.withValues(alpha: 0.9),
+                  cs.tertiary.withValues(alpha: 0.9),
+                  cs.primary.withValues(alpha: 0.9),
+                  Colors.transparent,
+                ]),
               ),
             ),
           ),
@@ -343,19 +367,16 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       ),
       child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 14),
-            child: Icon(Icons.paste_rounded, color: Colors.white38, size: 20),
-          ),
+          Padding(padding: const EdgeInsets.only(left: 14), child: Icon(Icons.paste_rounded, color: Colors.white38, size: 20)),
           Expanded(
             child: TextField(
               controller: _pasteCtrl,
-              style: const TextStyle(color: Colors.white, fontSize: 15),
-              decoration: const InputDecoration(
+              style: GoogleFonts.inter(color: Colors.white, fontSize: 15),
+              decoration: InputDecoration(
                 hintText: 'Paste QR / Pass ID',
-                hintStyle: TextStyle(color: Colors.white24),
+                hintStyle: GoogleFonts.inter(color: Colors.white24),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               ),
               onSubmitted: _manualSubmit,
             ),
@@ -381,21 +402,11 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 // ── Result Bottom Sheet ──────────────────────────────────────────────────────
 
 class _ResultSheet extends StatefulWidget {
-  final bool valid;
-  final String reason;
-  final GatePass? match;
-  final String pid;
+  final ScanResult result;
   final VoidCallback onScanAgain;
   final VoidCallback onClose;
 
-  const _ResultSheet({
-    required this.valid,
-    required this.reason,
-    required this.match,
-    required this.pid,
-    required this.onScanAgain,
-    required this.onClose,
-  });
+  const _ResultSheet({required this.result, required this.onScanAgain, required this.onClose});
 
   @override
   State<_ResultSheet> createState() => _ResultSheetState();
@@ -409,9 +420,7 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
   void initState() {
     super.initState();
     _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
-    );
+    _pulseAnim = Tween<double>(begin: 0.88, end: 1.0).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -420,10 +429,51 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
     super.dispose();
   }
 
+  _StatusConfig _getStatusConfig() {
+    switch (widget.result.status) {
+      case PassScanStatus.valid:
+        return _StatusConfig(
+          icon: Icons.verified_rounded,
+          color: Colors.green,
+          title: 'ACCESS GRANTED',
+          subtitle: 'Pass verified successfully',
+        );
+      case PassScanStatus.notStarted:
+        return _StatusConfig(
+          icon: Icons.schedule_rounded,
+          color: Colors.orange,
+          title: 'NOT STARTED YET',
+          subtitle: 'Event has not begun',
+        );
+      case PassScanStatus.expired:
+        return _StatusConfig(
+          icon: Icons.timer_off_rounded,
+          color: Colors.red,
+          title: 'PASS EXPIRED',
+          subtitle: 'Validity period has ended',
+        );
+      case PassScanStatus.duplicate:
+        return _StatusConfig(
+          icon: Icons.replay_circle_filled_rounded,
+          color: Colors.amber.shade700,
+          title: 'ALREADY SCANNED',
+          subtitle: 'This pass was checked in earlier',
+        );
+      case PassScanStatus.unknown:
+        return _StatusConfig(
+          icon: Icons.help_outline_rounded,
+          color: Colors.grey,
+          title: 'UNKNOWN PASS',
+          subtitle: 'Not found in the system',
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final statusColor = widget.valid ? Colors.green : Colors.red;
+    final config = _getStatusConfig();
+    final r = widget.result;
 
     return Container(
       width: double.infinity,
@@ -451,15 +501,11 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.08),
+                        color: config.color.withValues(alpha: 0.08),
                         shape: BoxShape.circle,
-                        border: Border.all(color: statusColor.withValues(alpha: 0.15), width: 2),
+                        border: Border.all(color: config.color.withValues(alpha: 0.2), width: 3),
                       ),
-                      child: Icon(
-                        widget.valid ? Icons.verified_rounded : Icons.cancel_rounded,
-                        color: statusColor,
-                        size: 56,
-                      ),
+                      child: Icon(config.icon, color: config.color, size: 56),
                     ),
                   );
                 },
@@ -467,35 +513,28 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
             ),
             const SizedBox(height: 12),
 
-            // Status text
-            Text(
-              widget.valid ? 'ACCESS GRANTED' : 'ACCESS DENIED',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w900,
-                color: statusColor,
-                letterSpacing: 0.8,
+            // Title
+            Text(config.title, style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w900, color: config.color, letterSpacing: 0.8)),
+            const SizedBox(height: 4),
+
+            // Reason badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: config.color.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: config.color.withValues(alpha: 0.1)),
               ),
+              child: Text(r.reason, style: GoogleFonts.inter(fontSize: 13, color: config.color, fontWeight: FontWeight.w500)),
             ),
-            if (widget.reason != 'OK') ...[
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(widget.reason, style: TextStyle(fontSize: 13, color: statusColor, fontWeight: FontWeight.w500)),
-              ),
-            ],
             const SizedBox(height: 18),
 
             // Pass details
-            if (widget.match != null)
-              _buildMatchDetails(context, cs)
+            if (r.match != null)
+              _buildMatchDetails(context, cs, config.color)
             else
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
                 child: Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -506,9 +545,9 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.info_outline_rounded, size: 18, color: cs.onSurfaceVariant),
+                      Icon(Icons.search_off_rounded, size: 18, color: cs.onSurfaceVariant),
                       const SizedBox(width: 8),
-                      Flexible(child: Text('Pass ID: ${widget.pid}', style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant, fontFamily: 'monospace'))),
+                      Flexible(child: Text('ID: ${r.pid}', style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant, fontFamily: 'monospace'))),
                     ],
                   ),
                 ),
@@ -524,7 +563,7 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
                   Expanded(
                     child: OutlinedButton(
                       onPressed: widget.onClose,
-                      child: const Text('CLOSE'),
+                      child: Text('CLOSE', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -533,7 +572,7 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
                     child: FilledButton.icon(
                       onPressed: widget.onScanAgain,
                       icon: const Icon(Icons.qr_code_scanner_rounded, size: 22),
-                      label: const Text('SCAN AGAIN'),
+                      label: Text('SCAN AGAIN', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                     ),
                   ),
                 ],
@@ -545,9 +584,8 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
     );
   }
 
-  Widget _buildMatchDetails(BuildContext context, ColorScheme cs) {
-    final m = widget.match!;
-    final statusColor = widget.valid ? Colors.green : Colors.red;
+  Widget _buildMatchDetails(BuildContext context, ColorScheme cs, Color statusColor) {
+    final m = widget.result.match!;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -574,7 +612,7 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(m.fullName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                    Text(m.fullName, style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800)),
                     Text(m.passId, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, fontFamily: 'monospace')),
                   ],
                 ),
@@ -585,7 +623,7 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
                   color: cs.primaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(m.category.name, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: cs.onPrimaryContainer)),
+                child: Text(m.category.name, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: cs.onPrimaryContainer)),
               ),
             ],
           ),
@@ -604,6 +642,8 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
           _infoRow(Icons.date_range_rounded, 'Valid',
               '${DateFormat('dd MMM yyyy').format(m.validFrom)} — ${DateFormat('dd MMM yyyy').format(m.validTo)}', cs),
           _infoRow(Icons.category_rounded, 'Type', m.eventType.name, cs),
+          if (m.lastScannedAt != null)
+            _infoRow(Icons.history_rounded, 'Last Scan', DateFormat.yMd().add_jm().format(m.lastScannedAt!), cs),
         ],
       ),
     );
@@ -623,15 +663,20 @@ class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderSta
             child: Icon(icon, size: 16, color: cs.onSurfaceVariant),
           ),
           const SizedBox(width: 10),
-          SizedBox(
-            width: 72,
-            child: Text(label, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500)),
-          ),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
+          SizedBox(width: 72, child: Text(label, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500))),
+          Expanded(child: Text(value, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500))),
         ],
       ),
     );
   }
+}
+
+class _StatusConfig {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  const _StatusConfig({required this.icon, required this.color, required this.title, required this.subtitle});
 }
 
 // ── Overlay Painter ──────────────────────────────────────────────────────────

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../models/gate_pass.dart';
 
 class PassesScreen extends StatefulWidget {
   final List<GatePass> passes;
   final Future<void> Function(PassLog) onAddLog;
-  const PassesScreen({super.key, required this.passes, required this.onAddLog});
+  final Future<void> Function(GatePass) onUpdatePass;
+  const PassesScreen({super.key, required this.passes, required this.onAddLog, required this.onUpdatePass});
 
   @override
   State<PassesScreen> createState() => _PassesScreenState();
@@ -44,16 +47,13 @@ class _PassesScreenState extends State<PassesScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHigh,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: cs.surfaceContainerHigh, shape: BoxShape.circle),
               child: Icon(Icons.badge_outlined, size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
             ),
             const SizedBox(height: 16),
-            Text('No passes yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
+            Text('No passes yet', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
             const SizedBox(height: 6),
-            Text('Use Issue tab or Import button', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant.withValues(alpha: 0.6))),
+            Text('Use Issue tab or Import button', style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant.withValues(alpha: 0.6))),
           ],
         ),
       );
@@ -69,18 +69,9 @@ class _PassesScreenState extends State<PassesScreen> {
             controller: _searchCtrl,
             onChanged: (v) => setState(() => _query = v),
             hintText: 'Search passes...',
-            leading: const Padding(
-              padding: EdgeInsets.only(left: 12),
-              child: Icon(Icons.search_rounded, size: 24),
-            ),
+            leading: const Padding(padding: EdgeInsets.only(left: 12), child: Icon(Icons.search_rounded, size: 24)),
             trailing: _query.isNotEmpty
-                ? [IconButton(
-                    icon: const Icon(Icons.clear_rounded, size: 22),
-                    onPressed: () {
-                      _searchCtrl.clear();
-                      setState(() => _query = '');
-                    },
-                  )]
+                ? [IconButton(icon: const Icon(Icons.clear_rounded, size: 22), onPressed: () { _searchCtrl.clear(); setState(() => _query = ''); })]
                 : null,
             padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 4)),
           ),
@@ -91,20 +82,14 @@ class _PassesScreenState extends State<PassesScreen> {
             alignment: Alignment.centerLeft,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '${filtered.length} pass${filtered.length == 1 ? '' : 'es'}',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.primary),
-              ),
+              decoration: BoxDecoration(color: cs.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
+              child: Text('${filtered.length} pass${filtered.length == 1 ? '' : 'es'}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: cs.primary)),
             ),
           ),
         ),
         Expanded(
           child: filtered.isEmpty
-              ? Center(child: Text('No matches found', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 15)))
+              ? Center(child: Text('No matches found', style: GoogleFonts.inter(color: cs.onSurfaceVariant, fontSize: 15)))
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                   itemCount: filtered.length,
@@ -116,8 +101,9 @@ class _PassesScreenState extends State<PassesScreen> {
   }
 
   Widget _buildPassCard(BuildContext context, ColorScheme cs, GatePass pass, int index) {
-    final isValid = pass.validTo.isAfter(DateTime.now());
-    final statusColor = isValid ? Colors.green : cs.error;
+    final statusColor = _statusColor(pass, cs);
+    final statusLabel = pass.statusLabel;
+    final statusIcon = _statusIcon(pass);
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -132,23 +118,20 @@ class _PassesScreenState extends State<PassesScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
-          onTap: () => _showDetails(context, pass, cs, isValid),
+          onTap: () => _showDetails(context, pass, cs),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     color: cs.primaryContainer,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Center(
-                    child: Text(
-                      pass.category.name[0],
-                      style: TextStyle(color: cs.onPrimaryContainer, fontWeight: FontWeight.w800, fontSize: 20),
-                    ),
+                    child: Text(pass.category.name[0], style: GoogleFonts.inter(color: cs.onPrimaryContainer, fontWeight: FontWeight.w800, fontSize: 22)),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -156,23 +139,36 @@ class _PassesScreenState extends State<PassesScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(pass.fullName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                      Text(pass.fullName, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16)),
                       const SizedBox(height: 3),
-                      Text(pass.passId, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant, fontFamily: 'monospace')),
-                      Text('${pass.eventName} • ${pass.category.name}', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.7))),
+                      Text(pass.eventName, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500)),
+                      Text(pass.passId, style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontFamily: 'monospace')),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    isValid ? 'VALID' : 'EXPIRED',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor),
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, size: 13, color: statusColor),
+                          const SizedBox(width: 4),
+                          Text(statusLabel, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor)),
+                        ],
+                      ),
+                    ),
+                    if (pass.scannedToday) ...[
+                      const SizedBox(height: 4),
+                      Text('Scanned today', style: GoogleFonts.inter(fontSize: 9, color: cs.onSurfaceVariant.withValues(alpha: 0.6))),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -182,7 +178,23 @@ class _PassesScreenState extends State<PassesScreen> {
     );
   }
 
-  void _showDetails(BuildContext context, GatePass pass, ColorScheme cs, bool isValid) {
+  Color _statusColor(GatePass pass, ColorScheme cs) {
+    if (pass.isNotStarted) return Colors.orange;
+    if (pass.isExpired) return cs.error;
+    if (pass.scannedToday) return cs.tertiary;
+    return Colors.green;
+  }
+
+  IconData _statusIcon(GatePass pass) {
+    if (pass.isNotStarted) return Icons.schedule_rounded;
+    if (pass.isExpired) return Icons.timer_off_rounded;
+    if (pass.scannedToday) return Icons.replay_rounded;
+    return Icons.check_circle_rounded;
+  }
+
+  void _showDetails(BuildContext context, GatePass pass, ColorScheme cs) {
+    final isValid = pass.isActive;
+
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -212,17 +224,12 @@ class _PassesScreenState extends State<PassesScreen> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      Text(
-                        isValid ? 'ACTIVE PASS' : 'EXPIRED PASS',
-                        style: TextStyle(
-                          color: isValid ? cs.onPrimaryContainer : cs.onErrorContainer,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
+                      Text(pass.statusLabel, style: GoogleFonts.inter(
+                        color: isValid ? cs.onPrimaryContainer : cs.onErrorContainer,
+                        fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: 1.2,
+                      )),
                       const SizedBox(height: 6),
-                      Text(pass.eventName, style: TextStyle(color: (isValid ? cs.onPrimaryContainer : cs.onErrorContainer).withValues(alpha: 0.7), fontSize: 13)),
+                      Text(pass.eventName, style: GoogleFonts.inter(color: (isValid ? cs.onPrimaryContainer : cs.onErrorContainer).withValues(alpha: 0.7), fontSize: 13)),
                       Text(pass.passId, style: TextStyle(color: (isValid ? cs.onPrimaryContainer : cs.onErrorContainer).withValues(alpha: 0.6), fontSize: 11, fontFamily: 'monospace')),
                     ],
                   ),
@@ -232,14 +239,9 @@ class _PassesScreenState extends State<PassesScreen> {
                     padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
                     child: Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
                       child: QrImageView(
-                        data: pass.qrPayload!,
-                        version: QrVersions.auto,
-                        size: 150,
+                        data: pass.qrPayload!, version: QrVersions.auto, size: 150,
                         eyeStyle: QrEyeStyle(color: cs.primary, eyeShape: QrEyeShape.circle),
                         dataModuleStyle: QrDataModuleStyle(color: cs.primary, dataModuleShape: QrDataModuleShape.circle),
                       ),
@@ -261,6 +263,7 @@ class _PassesScreenState extends State<PassesScreen> {
                       _detailRow(Icons.date_range_rounded, 'Valid', pass.formattedValidity, cs),
                       _detailRow(Icons.event_rounded, 'Type', pass.eventType.name, cs),
                       if (pass.groupRef != null && pass.groupRef!.isNotEmpty) _detailRow(Icons.confirmation_number_rounded, 'Ref', pass.groupRef!, cs),
+                      if (pass.lastScannedAt != null) _detailRow(Icons.history_rounded, 'Last Scan', DateFormat.yMd().add_jm().format(pass.lastScannedAt!), cs),
                     ],
                   ),
                 ),
@@ -268,21 +271,20 @@ class _PassesScreenState extends State<PassesScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Row(
                     children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('CLOSE'),
-                        ),
-                      ),
+                      Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: Text('CLOSE', style: GoogleFonts.inter(fontWeight: FontWeight.w600)))),
                       const SizedBox(width: 12),
                       Expanded(
                         child: FilledButton.icon(
                           onPressed: () async {
-                            await widget.onAddLog(PassLog(passId: pass.passId, action: 'ENTRY', gate: pass.gate, valid: isValid));
+                            await widget.onAddLog(PassLog(passId: pass.passId, action: 'ENTRY', gate: pass.gate, valid: isValid, scanStatus: pass.isActive ? 'valid' : pass.statusLabel.toLowerCase()));
+                            if (isValid) {
+                              pass.lastScannedAt = DateTime.now();
+                              await widget.onUpdatePass(pass);
+                            }
                             if (ctx.mounted) Navigator.pop(ctx);
                           },
                           icon: const Icon(Icons.login_rounded, size: 20),
-                          label: const Text('Log ENTRY'),
+                          label: Text('Log ENTRY', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                         ),
                       ),
                     ],
@@ -303,15 +305,12 @@ class _PassesScreenState extends State<PassesScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(6),
-            ),
+            decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(6)),
             child: Icon(icon, size: 16, color: cs.onSurfaceVariant),
           ),
           const SizedBox(width: 10),
-          SizedBox(width: 68, child: Text(label, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500))),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
+          SizedBox(width: 68, child: Text(label, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500))),
+          Expanded(child: Text(value, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500))),
         ],
       ),
     );
