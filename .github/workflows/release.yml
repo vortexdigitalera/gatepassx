@@ -164,8 +164,9 @@ jobs:
           set -e
           echo "Building APK versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER (using debug key)"
 
-          # Use a dedicated fresh Gradle home (setup-gradle action uses default home, not this)
-          export GRADLE_USER_HOME="${{ runner.temp }}/gradle-home"
+          # Use default Gradle home on system disk (runner.temp filesystem may cause jar creation issues)
+          export GRADLE_USER_HOME="${HOME}/.gradle-ci"
+          rm -rf "$GRADLE_USER_HOME"
           mkdir -p "$GRADLE_USER_HOME"
 
           # macOS runner has different SDK path
