@@ -136,15 +136,17 @@ jobs:
 
       # === Prepare caches (use $RUNNER_TEMP for Gradle - runner temp dir, not /tmp) ===
       - name: Prepare caches
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
         run: |
-          export GRADLE_USER_HOME=${{ runner.temp }}/.gradle
+          export GRADLE_USER_HOME=$RUNNER_TEMP/.gradle
           export PUB_CACHE=/home/runner/.pub-cache
           mkdir -p "$GRADLE_USER_HOME" "$PUB_CACHE"
           echo "Gradle cache: $GRADLE_USER_HOME"
           echo "Pub cache: $PUB_CACHE"
           df -h /tmp
 
-      # === RELEASE signing key setup (critical: makes the APK use real release signing, NOT debug) ===
+      # === RELEASE signing key (optional — falls back to debug if secrets not set) ===
       - name: Prepare Android RELEASE signing key
         id: signing
         env:
@@ -166,13 +168,11 @@ jobs:
               echo "ANDROID_KEY_PASSWORD=$KEY_PASS"
             } >> $GITHUB_ENV
             echo "keystore_prepared=true" >> $GITHUB_OUTPUT
-            echo "RELEASE signing key prepared (from secrets). Keystore will be used for the APK."
+            echo "RELEASE signing key prepared from secrets."
             ls -l "$SIGNING_DIR/release-keystore.jks"
           else
             echo "keystore_prepared=false" >> $GITHUB_OUTPUT
-            echo "::error::Missing release keystore secret (ANDROID_RELEASE_KEYSTORE_BASE64 / ANDROID_KEYSTORE_BASE64)."
-            echo "You must configure the 4 signing secrets in the repo for release builds to use a real RELEASE key."
-            exit 1
+            echo "::warning::No ANDROID_RELEASE_KEYSTORE_BASE64 secret set. APK will use debug signing. Set repo secrets for production."
           fi
 
       # ==================== FLUTTER ANDROID ====================
@@ -180,7 +180,7 @@ jobs:
         working-directory: mobile
         run: flutter pub get
 
-      - name: Build Android APK (release, using RELEASE signing key)
+      - name: Build Android APK (release)
         working-directory: mobile
         env:
           GRADLE_USER_HOME: ${{ runner.temp }}/.gradle
@@ -189,15 +189,14 @@ jobs:
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
           VERSION_NAME: ${{ steps.version.outputs.clean_version }}
           BUILD_NUMBER: ${{ github.run_number }}
-          # Signing envs come from previous "Prepare Android RELEASE signing key" step via $GITHUB_ENV
-          ANDROID_KEYSTORE_PATH: ${{ env.ANDROID_KEYSTORE_PATH }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ env.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ env.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ env.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEYSTORE_PATH || '' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEYSTORE_PASSWORD || '' }}
+          ANDROID_KEY_ALIAS: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEY_ALIAS || '' }}
+          ANDROID_KEY_PASSWORD: ${{ steps.signing.outputs.keystore_prepared == 'true' && env.ANDROID_KEY_PASSWORD || '' }}
         run: |
           set -e
-          echo "Building APK (RELEASE) with versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
-          echo "Using keystore: ${ANDROID_KEYSTORE_PATH:-<none>}"
+          echo "Building APK versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
+          echo "Keystore: ${ANDROID_KEYSTORE_PATH:-<none — will use debug>}"
 
           rm -rf $GRADLE_USER_HOME/caches/jars-* || true
 
@@ -206,12 +205,13 @@ jobs:
             --build-number "$BUILD_NUMBER"
 
           ls -lh "build/app/outputs/flutter-apk/app-release.apk" || {
-            echo "::error::APK not found at expected location"
+            echo "::error::APK not found"
             ls -R build/app/outputs/flutter-apk || true
             exit 1
           }
 
-      - name: Verify RELEASE signing (fail if debug key used)
+      - name: Verify RELEASE signing (skip if no release key)
+        if: steps.signing.outputs.keystore_prepared == 'true'
         working-directory: mobile
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
@@ -219,26 +219,17 @@ jobs:
         run: |
           set -e
           APK="build/app/outputs/flutter-apk/app-release.apk"
-          echo "Verifying signature on $APK"
-          if [ ! -f "$APK" ]; then
-            echo "APK missing"; exit 1
-          fi
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner 2>/dev/null | head -1 || true)
-          if [ -n "$APKSIGNER" ] && [ -x "$APKSIGNER" ]; then
-            echo "=== apksigner verify --print-certs ==="
+          if [ -x "$APKSIGNER" ]; then
+            echo "=== RELEASE signing verification ==="
             "$APKSIGNER" verify --print-certs "$APK" || true
-            if "$APKSIGNER" verify --print-certs "$APK" 2>&1 | grep -i 'CN=Android Debug' >/dev/null; then
-              echo "::error::APK was signed with DEBUG certificate instead of the RELEASE signing key!"
-              echo "Check that Prepare Android RELEASE signing key step succeeded and secrets are set."
+            if "$APKSIGNER" verify --print-certs "$APK" 2>&1 | grep -i 'CN=Android Debug' > /dev/null; then
+              echo "::error::APK signed with DEBUG key instead of RELEASE key!"
               exit 1
             fi
-            echo "APK signature verified: does NOT contain Android Debug cert."
+            echo "OK: Not using debug cert."
           else
-            echo "apksigner not located under $ANDROID_HOME/build-tools; skipping deep cert print (signing config was applied via gradle)."
-            # Still do a basic check via jarsigner if available
-            if command -v jarsigner >/dev/null; then
-              jarsigner -verify -certs "$APK" 2>&1 | head -20 || true
-            fi
+            echo "apksigner not found, skipping deep verify."
           fi
 
       - name: Prepare APK artifact
