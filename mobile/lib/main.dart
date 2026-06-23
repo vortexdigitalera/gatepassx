@@ -204,13 +204,22 @@ class _GatePassHomeState extends State<GatePassHome> {
 
   Future<void> _loadData() async {
     setState(() => _loading = true);
-    final passes = await storage.loadPasses();
-    final logs = await storage.loadLogs();
-    setState(() {
-      _passes = passes;
-      _logs = logs;
-      _loading = false;
-    });
+    try {
+      final passes = await storage.loadPasses();
+      final logs = await storage.loadLogs();
+      setState(() {
+        _passes = passes;
+        _logs = logs;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() => _loading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load data: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _savePass(GatePass pass) async {
@@ -239,9 +248,18 @@ class _GatePassHomeState extends State<GatePassHome> {
     List<GatePass> imported = [];
 
     if (file.extension?.toLowerCase() == 'json') {
-      final decoded = jsonDecode(content);
-      final list = decoded is List ? decoded : (decoded['passes'] ?? []);
-      imported = list.map<GatePass>((e) => GatePass.fromJson(e)).toList();
+      try {
+        final decoded = jsonDecode(content);
+        final list = decoded is List ? decoded : (decoded['passes'] ?? []);
+        imported = list.map<GatePass>((e) => GatePass.fromJson(e)).toList();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Import failed: invalid JSON — $e')),
+          );
+        }
+        return;
+      }
     } else {
       final lines = content.trim().split('\n');
       if (lines.length < 2) return;
@@ -259,8 +277,9 @@ class _GatePassHomeState extends State<GatePassHome> {
     }
 
     for (final p in imported) {
-      await _savePass(p);
+      await storage.addOrUpdatePass(p);
     }
+    await _loadData();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -272,11 +291,24 @@ class _GatePassHomeState extends State<GatePassHome> {
   }
 
   Future<void> _exportAll() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/gatepassx_export_${DateTime.now().millisecondsSinceEpoch}.json');
-    final data = _passes.map((p) => p.toJson()).toList();
-    await file.writeAsString(jsonEncode({'passes': data, 'exported_at': DateTime.now().toIso8601String()}));
-    await SharePlus.instance.share(ShareParams(text: 'Exported DePass JSON to ${file.path}'));
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/gatepassx_export_${DateTime.now().millisecondsSinceEpoch}.json');
+      final data = _passes.map((p) => p.toJson()).toList();
+      await file.writeAsString(jsonEncode({'passes': data, 'exported_at': DateTime.now().toIso8601String()}));
+      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)], text: 'DePass export'));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Export ready'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
+    }
   }
 
   void _onTabChange(int index) {
@@ -288,12 +320,10 @@ class _GatePassHomeState extends State<GatePassHome> {
     final cs = Theme.of(context).colorScheme;
 
     return PopScope(
-      canPop: _currentIndex == 0 && !_isScanner,
+      canPop: _currentIndex == 0,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        if (_isScanner || _currentIndex != 0) {
-          _onTabChange(0);
-        }
+        if (_currentIndex != 0) _onTabChange(0);
       },
       child: Scaffold(
         extendBody: true,
@@ -341,21 +371,7 @@ class _GatePassHomeState extends State<GatePassHome> {
               ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
-            : AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.04, 0),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  ),
-                ),
-                child: IndexedStack(
+            : IndexedStack(
                   index: _currentIndex,
                   children: [
                     DashboardScreen(
@@ -377,7 +393,6 @@ class _GatePassHomeState extends State<GatePassHome> {
                     LogsScreen(logs: _logs),
                   ],
                 ),
-              ),
         bottomNavigationBar: _isScanner
             ? null
             : SafeArea(

@@ -139,7 +139,17 @@ class GatePass {
       idNumber: json['id_number'] ?? json['idn'] ?? '',
       phone: json['phone'], email: json['email'], organizer: organizer,
       validFrom: DateTime.tryParse(json['valid_from'] ?? json['vf'] ?? '') ?? DateTime.now(),
-      validTo: DateTime.tryParse(json['valid_to'] ?? json['vt'] ?? '') ?? DateTime.now().add(const Duration(days: 3)),
+      validTo: () {
+        final parsed = DateTime.tryParse(json['valid_to'] ?? json['vt'] ?? '');
+        if (parsed != null) {
+          // If only a date was parsed (no time component), set to end of that day
+          if (parsed.hour == 0 && parsed.minute == 0 && parsed.second == 0) {
+            return DateTime(parsed.year, parsed.month, parsed.day, 23, 59, 59);
+          }
+          return parsed;
+        }
+        return DateTime.now().add(const Duration(days: 3));
+      }(),
       gate: json['gate'] ?? json['gt'],
       tableNumber: json['table_number'] ?? json['tbl'],
       groupRef: json['group_ref'] ?? json['grp'],

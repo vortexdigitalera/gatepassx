@@ -75,6 +75,7 @@ class _IssuePassScreenState extends State<IssuePassScreen> with SingleTickerProv
     pass.computeQrPayload(secret: AppConfig.qrSecret);
 
     await widget.onSave(pass);
+    if (!mounted) return;
     setState(() => _generatedPass = pass);
     _passCardCtrl.forward(from: 0);
 

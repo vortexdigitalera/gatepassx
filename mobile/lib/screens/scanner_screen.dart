@@ -55,6 +55,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
+    _beepPlayer.setReleaseMode(ReleaseMode.release);
     _scanLineCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
     _scanLineAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _scanLineCtrl, curve: Curves.easeInOutCubic),
@@ -83,7 +84,6 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   Future<void> _playFeedback(bool valid) async {
     HapticFeedback.heavyImpact();
     try {
-      await _beepPlayer.setReleaseMode(ReleaseMode.release);
       await _beepPlayer.play(AssetSource('sounds/beep.wav'), volume: 1.0);
     } catch (_) {}
   }
@@ -159,8 +159,8 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     );
     widget.onAddLog(log);
 
-    // Update lastScannedAt and scanCount for valid/duplicate scans
-    if (result.match != null && (result.status == PassScanStatus.valid || result.status == PassScanStatus.duplicate)) {
+    // Only update for valid (first-time) scans, not duplicates
+    if (result.match != null && result.status == PassScanStatus.valid) {
       result.match!.lastScannedAt = DateTime.now();
       result.match!.scanCount += 1;
       widget.onUpdatePass(result.match!);
@@ -170,14 +170,15 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   }
 
   void _showResult(ScanResult result) {
+    final sheetController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      transitionAnimationController: AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 400),
-      ),
+      transitionAnimationController: sheetController,
       builder: (ctx) => _ResultSheet(
         result: result,
         onScanAgain: () {
@@ -190,6 +191,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
         },
       ),
     ).then((_) {
+      sheetController.dispose();
       if (mounted) setState(() => _processing = false);
     });
   }
@@ -230,6 +232,24 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
                   fit: BoxFit.cover,
                   scanWindow: _scanRect,
                   overlayBuilder: (ctx, cons) => _buildOverlay(cons, cs),
+                  errorBuilder: (ctx, err) => ColoredBox(
+                    color: Colors.black,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.no_photography_rounded, color: Colors.white70, size: 48),
+                            const SizedBox(height: 12),
+                            Text('Camera unavailable', style: GoogleFonts.inter(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            Text(err.toString(), style: GoogleFonts.inter(color: Colors.white54, fontSize: 13), textAlign: TextAlign.center),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                   placeholderBuilder: (_) => const ColoredBox(
                     color: Colors.black,
                     child: Center(child: CircularProgressIndicator(color: Colors.white)),
@@ -331,7 +351,8 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   }
 
   Widget _buildOverlay(BoxConstraints cons, ColorScheme cs) {
-    final rect = _scanRect!;
+    final rect = _scanRect;
+    if (rect == null) return const SizedBox.shrink();
     return Stack(
       children: [
         CustomPaint(size: cons.biggest, painter: _OverlayPainter(rect, cs)),

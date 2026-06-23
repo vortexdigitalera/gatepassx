@@ -41,10 +41,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final active = widget.passes.where((p) => p.isActive).length;
-    final notStarted = widget.passes.where((p) => p.isNotStarted).length;
-    final expired = widget.passes.where((p) => p.isExpired).length;
-    final totalScans = widget.passes.fold<int>(0, (sum, p) => sum + p.scanCount);
+    int active = 0, notStarted = 0, expired = 0, totalScans = 0;
+    for (final p in widget.passes) {
+      if (p.isNotStarted) {
+        notStarted++;
+      } else if (p.isExpired) {
+        expired++;
+      } else {
+        active++;
+      }
+      totalScans += p.scanCount;
+    }
 
     // Find nearest upcoming event
     final upcomingPasses = widget.passes.where((p) => p.isNotStarted).toList()

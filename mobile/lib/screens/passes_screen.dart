@@ -286,9 +286,16 @@ class _PassesScreenState extends State<PassesScreen> {
                           onPressed: () async {
                             await widget.onAddLog(PassLog(passId: pass.passId, action: 'ENTRY', gate: pass.gate, valid: isValid, scanStatus: pass.isActive ? 'valid' : pass.statusLabel.toLowerCase()));
                             if (isValid) {
-                              pass.lastScannedAt = DateTime.now();
-                              pass.scanCount += 1;
-                              await widget.onUpdatePass(pass);
+                              final updated = GatePass(
+                                passId: pass.passId, eventName: pass.eventName, eventType: pass.eventType,
+                                category: pass.category, fullName: pass.fullName, idNumber: pass.idNumber,
+                                phone: pass.phone, email: pass.email, organizer: pass.organizer,
+                                validFrom: pass.validFrom, validTo: pass.validTo, gate: pass.gate,
+                                tableNumber: pass.tableNumber, groupRef: pass.groupRef,
+                                issuedAt: pass.issuedAt, issuedBy: pass.issuedBy,
+                                lastScannedAt: DateTime.now(), scanCount: pass.scanCount + 1,
+                              )..qrPayload = pass.qrPayload;
+                              await widget.onUpdatePass(updated);
                             }
                             if (ctx.mounted) Navigator.pop(ctx);
                           },
