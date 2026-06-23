@@ -84,6 +84,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: wrapper
+
       - name: Pre-accept SDK licenses (early hack to avoid fetch/compute hangs)
         run: |
           # Pre-write to user-writable locations before the action installs.
