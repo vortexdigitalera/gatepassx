@@ -7,9 +7,9 @@ ext.flutter = [
     targetSdkVersion: 36,
     ndkVersion: "25.1.8937393"
 ]
-ext.kotlin_version = '2.1.0'
 
 buildscript {
+    def kotlin_version = '2.1.0'
     repositories {
         google()
         mavenCentral()
@@ -19,7 +19,9 @@ buildscript {
     }
 }
 
-// Force consistent Kotlin 1.9.x to avoid conflicts with plugins that pull Kotlin 2.x stdlib (e.g. mobile_scanner)
+ext.kotlin_version = '2.1.0'  // expose to project scope for allprojects and resolutionStrategy
+
+// Force consistent Kotlin version to avoid conflicts with plugins that pull different stdlib (e.g. mobile_scanner 2.1)
 allprojects {
     repositories {
         google()
@@ -31,8 +33,6 @@ allprojects {
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
             force "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
-            force "org.jetbrains.kotlin:kotlin-stdlib:2.1.0"
-            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.1.0"
         }
     }
 }
