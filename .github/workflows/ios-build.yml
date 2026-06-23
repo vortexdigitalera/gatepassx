@@ -81,20 +81,19 @@ jobs:
         run: |
           set -euo pipefail
           if [ -d "mobile/build/ios/iphoneos" ]; then
-            # .app bundle
-            tar czf "gatepassx-ios-${VERSION}.tar.gz" \
+            tar czf "depass-ios-${VERSION}.tar.gz" \
               -C mobile/build/ios/iphoneos Runner.app
-            ls -lh "gatepassx-ios-${VERSION}.tar.gz"
+            ls -lh "depass-ios-${VERSION}.tar.gz"
           fi
           if [ -f "export/Runner.ipa" ]; then
-            cp "export/Runner.ipa" "gatepassx-ios-${VERSION}.ipa"
-            ls -lh "gatepassx-ios-${VERSION}.ipa"
+            cp "export/Runner.ipa" "depass-ios-${VERSION}.ipa"
+            ls -lh "depass-ios-${VERSION}.ipa"
           fi
 
       - name: Upload iOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-build-${{ github.event.inputs.version }}
-          path: gatepassx-ios-*
+          path: depass-ios-*
           if-no-files-found: error
           retention-days: 7

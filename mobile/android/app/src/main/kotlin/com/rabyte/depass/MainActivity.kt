@@ -1,4 +1,4 @@
-package com.rabyte.gpxadmin
+package com.rabyte.depass
 
 import io.flutter.embedding.android.FlutterActivity
 

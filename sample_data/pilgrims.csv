@@ -1,6 +1,0 @@
-pass_id,category,full_name,id_number,phone,operator,trip_type,valid_from,valid_to,gate,group_ref,issued_by
-AHUON-HAJJ-2026-000101,PILGRIM,Alhaji Musa Ibrahim,NG12345678,08012345678,Al-Mufid Travels,HAJJ,2026-06-25,2026-07-20,Lagos Hajj Camp Gate A,FL-KE-442,AHUON-Ops
-AHUON-HAJJ-2026-000102,PILGRIM,Fatima Abdullahi,A1234567,08098765432,Al-Mufid Travels,HAJJ,2026-06-25,2026-07-20,Lagos Hajj Camp Gate A,FL-KE-442,AHUON-Ops
-AHUON-UMR-2026-000051,PILGRIM,Yusuf Okoro,NG99887766,08111222333,Naija Pilgrims Ltd,UMRAH,2026-07-01,2026-07-15,Abuja Assembly Gate 2,UM-ABJ-99,AHUON-Ops
-AHUON-HAJJ-2026-000215,STAFF,Aisha Bello,STAFF-442,08033445566,Al-Mufid Travels,HAJJ,2026-06-20,2026-07-25,Lagos Hajj Camp Gate A,,AHUON-Ops
-AHUON-HAJJ-2026-V001,VEHICLE,Bus - Toyota Coaster,ABC-1234,,Kano Hajj Services,HAJJ,2026-06-24,2026-07-22,Lagos Hajj Camp Gate A,FL-KE-442,AHUON-Ops

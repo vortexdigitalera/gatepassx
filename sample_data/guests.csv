@@ -1,0 +1,9 @@
+pass_id,event_name,event_type,category,full_name,id_number,phone,email,organizer,valid_from,valid_to,gate,table_number,group_ref,issued_by
+GPX-DINNER-2026-000001,Annual Gala Dinner,DINNER,GUEST,Chioma Okafor,REG-001,+2348012345678,chioma@example.com,Prestige Events,2026-07-15,2026-07-15,Main Entrance,T-01,INV-2026-001,GatePassX
+GPX-DINNER-2026-000002,Annual Gala Dinner,DINNER,VIP,Chief Adewale Johnson,REG-002,+2348098765432,adewale@example.com,Prestige Events,2026-07-15,2026-07-15,VIP Entrance,T-01,INV-2026-002,GatePassX
+GPX-GALA-2026-000010,Charity Gala Night,GALA,GUEST,Amina Bello,REG-010,+2348111222333,amina@example.com,Charity Foundation,2026-08-20,2026-08-20,Ballroom Gate,T-05,INV-2026-010,GatePassX
+GPX-CONFERENCE-2026-000020,Tech Summit 2026,CONFERENCE,SPEAKER,Dr. Emeka Nwosu,REG-020,+2348033445566,emeka@techcorp.com,TechCorp Nigeria,2026-09-10,2026-09-12,Conference Hall A,,SPK-2026-001,GatePassX
+GPX-CONFERENCE-2026-000021,Tech Summit 2026,CONFERENCE,STAFF,Sarah Ibrahim,STAFF-001,+2348055667788,,TechCorp Nigeria,2026-09-08,2026-09-13,Staff Entrance,,STF-2026-001,GatePassX
+GPX-WEDDING-2026-000030,Ahmed & Fatima Wedding,WEDDING,GUEST,Blessing Ogunlade,REG-030,+2348077889900,blessing@example.com,Ahmed Family,2026-10-05,2026-10-05,Garden Gate,T-12,INV-2026-030,GatePassX
+GPX-CONCERT-2026-000040,Lagos Music Festival,CONCERT,PERFORMER,DJ Spinall,PERF-001,+2348011223344,dj@spinall.com,SoundWave Ltd,2026-11-15,2026-11-15,Backstage Gate,,PERF-2026-001,GatePassX
+GPX-CONCERT-2026-000041,Lagos Music Festival,CONCERT,MEDIA,Kelechi Amadi,MEDIA-001,+2348044556677,kelechi@press.com,SoundWave Ltd,2026-11-15,2026-11-15,Press Entrance,,MED-2026-001,GatePassX

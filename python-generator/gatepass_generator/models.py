@@ -1,8 +1,10 @@
-"""Core data models for AHUON GatePassX."""
+"""Core data models for GatePassX — Dinner & Event Gate Pass system."""
 
 from __future__ import annotations
 
 import hmac
+import hashlib
+import json
 import os
 import warnings
 from datetime import datetime, date
@@ -10,64 +12,70 @@ from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
-import hashlib
-import json
+
+QR_SECRET_ENV = "GATEPASSX_QR_SECRET"
+_QR_SECRET_DEV_DEFAULT = "gpx-dev-secret-do-not-use-in-production"
 
 
-_QR_SECRET_ENV_VAR = "AHUON_QR_SECRET"
-_QR_SECRET_DEV_DEFAULT = "ahuon-dev-secret-do-not-use-in-production"
-
-
-def _get_qr_secret() -> str:
+def get_qr_secret() -> str:
     """Return the QR signing secret from env, or warn and fall back to dev default."""
-    secret = os.environ.get(_QR_SECRET_ENV_VAR)
+    secret = os.environ.get(QR_SECRET_ENV)
     if not secret:
         warnings.warn(
-            f"{_QR_SECRET_ENV_VAR} not set — using insecure dev default. "
-            f"Set {_QR_SECRET_ENV_VAR} in production."
+            f"{QR_SECRET_ENV} not set — using insecure dev default. "
+            f"Set {QR_SECRET_ENV} for production.",
+            stacklevel=2,
         )
-        secret = _QR_SECRET_DEV_DEFAULT
+        return _QR_SECRET_DEV_DEFAULT
     return secret
 
 
-class TripType(str, Enum):
-    SINGLE_DAY = "SINGLE_DAY"
-    MULTI_DAY = "MULTI_DAY"
-    VIP_ACCESS = "VIP_ACCESS"
-    BACKSTAGE = "BACKSTAGE"
-    EXHIBITOR = "EXHIBITOR"
+class EventType(str, Enum):
+    DINNER = "DINNER"
+    GALA = "GALA"
+    CONFERENCE = "CONFERENCE"
+    WEDDING = "WEDDING"
+    CONCERT = "CONCERT"
+    FESTIVAL = "FESTIVAL"
+    EXHIBITION = "EXHIBITION"
+    CORPORATE = "CORPORATE"
+    PRIVATE_PARTY = "PRIVATE_PARTY"
+    OTHER = "OTHER"
 
 
 class PassCategory(str, Enum):
-    ATTENDEE = "ATTENDEE"
+    GUEST = "GUEST"
     VIP = "VIP"
     STAFF = "STAFF"
     SPEAKER = "SPEAKER"
+    PERFORMER = "PERFORMER"
     MEDIA = "MEDIA"
     VENDOR = "VENDOR"
+    EXHIBITOR = "EXHIBITOR"
 
 
 class GatePass(BaseModel):
-    """AHUON Gate Pass record."""
+    """GatePassX event gate pass record."""
 
-    pass_id: str = Field(..., description="Unique pass identifier e.g. AHUON-HAJJ-2026-000042")
-    category: PassCategory
+    pass_id: str = Field(..., description="Unique pass identifier, e.g. GPX-DINNER-2026-000042")
+    event_name: str = Field("General Event", description="Name of the event")
+    event_type: EventType = Field(EventType.DINNER)
+    category: PassCategory = Field(PassCategory.GUEST)
     full_name: str
-    id_number: str = Field(..., description="Passport, NIN, or license plate for vehicles")
+    id_number: str = Field(..., description="ID card, passport, NIN, or registration number")
     phone: Optional[str] = None
-    operator: str = Field(..., description="AHUON registered tour operator / company")
-    trip_type: Optional[TripType] = None
+    email: Optional[str] = None
+    organizer: str = Field("Event Organizer", description="Event organizer or hosting company")
     valid_from: date
     valid_to: date
-    gate: Optional[str] = Field(None, description="Designated gate or checkpoint")
-    group_ref: Optional[str] = Field(None, description="Flight, bus, or group reference")
-    vehicle_plate: Optional[str] = None
+    gate: Optional[str] = Field(None, description="Designated entrance gate or checkpoint")
+    table_number: Optional[str] = Field(None, description="Table or seat assignment (for dinners/galas)")
+    group_ref: Optional[str] = Field(None, description="Group, booking, or invitation reference")
     issued_at: datetime = Field(default_factory=datetime.utcnow)
-    issued_by: str = "system"
+    issued_by: str = "GatePassX"
     notes: Optional[str] = None
 
-    # Computed / populated later
-    qr_payload: Optional[str] = None  # The exact string encoded in the QR
+    qr_payload: Optional[str] = None
 
     model_config = {"use_enum_values": True}
 
@@ -80,45 +88,60 @@ class GatePass(BaseModel):
         return v
 
     def to_verification_dict(self, secret: Optional[str] = None) -> dict:
-        """Return the minimal dict used for QR and verification."""
-        base = {
+        """Return the minimal dict embedded in the QR code."""
+        base: dict = {
             "pid": self.pass_id,
+            "ev": self.event_name,
             "nm": self.full_name,
             "cat": self.category.value if isinstance(self.category, PassCategory) else self.category,
             "idn": self.id_number,
-            "op": self.operator,
+            "org": self.organizer,
             "vf": self.valid_from.isoformat(),
             "vt": self.valid_to.isoformat(),
             "gt": self.gate or "",
         }
+        if self.table_number:
+            base["tbl"] = self.table_number
         if self.group_ref:
             base["grp"] = self.group_ref
-        if self.vehicle_plate:
-            base["vp"] = self.vehicle_plate
 
         if secret:
             sig = hmac.new(
-                secret.encode("utf-8"),
-                json.dumps(base, sort_keys=True).encode("utf-8"),
+                secret.encode(),
+                json.dumps(base, sort_keys=True).encode(),
                 hashlib.sha256,
             ).hexdigest()[:16]
             base["sig"] = sig
         return base
 
     def compute_qr_payload(self, secret: Optional[str] = None) -> str:
-        """Produce the string that will be put into the QR code."""
+        """Produce the JSON string that will be encoded in the QR code."""
         data = self.to_verification_dict(secret=secret)
         payload = json.dumps(data, separators=(",", ":"))
         self.qr_payload = payload
         return payload
 
     @classmethod
-    def from_dict(cls, data: dict) -> "GatePass":
-        return cls(**data)
+    def from_qr_payload(cls, payload: str) -> "GatePass":
+        """Reconstruct a GatePass from a QR payload string (no signature verification)."""
+        data = json.loads(payload)
+        return cls(
+            pass_id=data.get("pid", "UNKNOWN"),
+            event_name=data.get("ev", "Event"),
+            full_name=data.get("nm", ""),
+            category=PassCategory(data.get("cat", "GUEST")),
+            id_number=data.get("idn", ""),
+            organizer=data.get("org", "Unknown"),
+            valid_from=date.fromisoformat(data["vf"]),
+            valid_to=date.fromisoformat(data["vt"]),
+            gate=data.get("gt") or None,
+            table_number=data.get("tbl"),
+            group_ref=data.get("grp"),
+        )
 
 
 class PassLogEntry(BaseModel):
-    """Audit log entry for entry/exit events (used by mobile + reports)."""
+    """Audit log entry for entry/exit events."""
 
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     pass_id: str

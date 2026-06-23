@@ -1,16 +1,11 @@
-# gatepassx
+# GatePassX
 
-AHUON Gate Pass mobile app
+Dinner & Event Gate Pass mobile app
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+This is the Flutter mobile companion app for GatePassX. It provides on-the-spot pass issuance, QR scanning, validation, and entry/exit logging at event venues.
 
-A few resources to get you started if this is your first Flutter project:
-
+- [Flutter docs](https://docs.flutter.dev/)
 - [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
 - [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.

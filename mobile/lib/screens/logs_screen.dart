@@ -4,21 +4,22 @@ import '../models/gate_pass.dart';
 
 class LogsScreen extends StatelessWidget {
   final List<PassLog> logs;
-
   const LogsScreen({super.key, required this.logs});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     if (logs.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history_outlined, size: 64, color: Colors.grey.shade300),
+            Icon(Icons.history_outlined, size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.3)),
             const SizedBox(height: 12),
-            Text('No activity yet', style: TextStyle(fontSize: 16, color: Colors.grey.shade500)),
+            Text('No activity yet', style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant)),
             const SizedBox(height: 4),
-            Text('Scan passes to see logs here', style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
+            Text('Scan passes to see logs here', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.7))),
           ],
         ),
       );
@@ -31,54 +32,43 @@ class LogsScreen extends StatelessWidget {
         final l = logs[i];
         final isEntry = l.action == 'ENTRY';
         final isReject = l.action == 'REJECTED';
-        final color = isReject ? Colors.red : (isEntry ? Colors.green : Colors.orange);
+        final color = isReject ? cs.error : (isEntry ? Colors.green : cs.tertiary);
         final icon = isReject ? Icons.block : (isEntry ? Icons.login_rounded : Icons.logout_rounded);
 
         return Card(
-          margin: const EdgeInsets.only(bottom: 6),
+          margin: const EdgeInsets.only(bottom: 4),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            leading: Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: color, size: 22),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            leading: CircleAvatar(
+              backgroundColor: color.withValues(alpha: 0.1),
+              child: Icon(icon, color: color, size: 20),
             ),
             title: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                   decoration: BoxDecoration(
-                     color: color.withValues(alpha: 0.1),
-                     borderRadius: BorderRadius.circular(6),
-                   ),
-                  child: Text(l.action, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+                Chip(
+                  label: Text(l.action, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+                  backgroundColor: color.withValues(alpha: 0.08),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Text(l.passId, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                ),
+                Expanded(child: Text(l.passId, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
               ],
             ),
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 '${DateFormat.yMd().add_jm().format(l.timestamp)}${l.gate != null ? ' • ${l.gate}' : ''}',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
             ),
             trailing: l.notes != null && l.notes != 'OK'
-                ? Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(l.notes!, style: TextStyle(fontSize: 9, color: Colors.red.shade400)),
+                ? Tooltip(
+                    message: l.notes!,
+                    child: Icon(Icons.info_outline, size: 18, color: cs.error.withValues(alpha: 0.6)),
                   )
-                : Icon(Icons.check_circle, size: 18, color: Colors.green.shade300),
+                : Icon(Icons.check_circle_outline, size: 18, color: Colors.green.withValues(alpha: 0.6)),
           ),
         );
       },

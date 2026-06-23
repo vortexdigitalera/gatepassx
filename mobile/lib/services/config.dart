@@ -4,26 +4,23 @@ import 'dart:io' show Platform;
 class AppConfig {
   AppConfig._();
 
-  static const String _devSecret = 'ahuon-dev-secret-do-not-use-in-production';
-  static const String _envKey = 'AHUON_QR_SECRET';
+  static const String _devSecret = 'gpx-dev-secret-do-not-use-in-production';
+  static const String _envKey = 'GATEPASSX_QR_SECRET';
   static bool _warned = false;
 
   /// The secret used to HMAC-sign QR payloads.
   ///
   /// Precedence:
-  /// 1. --dart-define=AHUON_QR_SECRET=...
-  /// 2. Platform.environment['AHUON_QR_SECRET']
+  /// 1. --dart-define=GATEPASSX_QR_SECRET=...
+  /// 2. Platform.environment['GATEPASSX_QR_SECRET']
   /// 3. Insecure dev default (prints a warning once)
   static String get qrSecret {
-    // 1. Compile-time dart-define
     const fromDefine = String.fromEnvironment(_envKey);
     if (fromDefine.isNotEmpty) return fromDefine;
 
-    // 2. Runtime env (useful for tests / desktop)
     final fromEnv = Platform.environment[_envKey];
     if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
 
-    // 3. Dev fallback
     if (!_warned) {
       _warned = true;
       // ignore: avoid_print

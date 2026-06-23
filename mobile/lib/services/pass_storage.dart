@@ -3,8 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/gate_pass.dart';
 
 class PassStorage {
-  static const _passesKey = 'ahuon_passes';
-  static const _logsKey = 'ahuon_logs';
+  static const _passesKey = 'gpx_passes';
+  static const _logsKey = 'gpx_logs';
 
   Future<List<GatePass>> loadPasses() async {
     final prefs = await SharedPreferences.getInstance();
@@ -46,8 +46,7 @@ class PassStorage {
 
   Future<void> addLog(PassLog log) async {
     final logs = await loadLogs();
-    logs.insert(0, log); // newest first
-    // keep last 200
+    logs.insert(0, log);
     if (logs.length > 200) logs.removeRange(200, logs.length);
     await saveLogs(logs);
   }

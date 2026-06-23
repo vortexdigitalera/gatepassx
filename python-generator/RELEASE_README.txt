@@ -1,21 +1,26 @@
-GatePassX Python Generator (AHUON)
+GatePassX — Dinner & Event Gate Pass CLI
 
-This is a standalone packaging of the gate pass PDF + QR generator tool.
+Standalone CLI tool for generating printable event gate passes with QR codes.
 
-## Requirements
-pip install -r requirements.txt
+## Install
+  pip install -r requirements.txt
 
-## Usage Examples
+## Commands
 
-Generate passes from CSV:
-  python -m gatepass_generator generate -i sample_data/pilgrims.csv -o passes/ --sheet
+  gatepassx --help                          # Show all commands
+  gatepassx template -o guests.json         # Create a data template
+  gatepassx new -o pass.json                # Create a pass interactively
+  gatepassx generate -i data.json -o out/   # Generate PDFs
+  gatepassx generate -i data.csv -o out/ --sheet --qr-only  # Batch PDFs + QRs
+  gatepassx qr -i pass.json -o qr.png       # Single QR code image
+  gatepassx validate pass.json              # Validate a pass file
+  gatepassx scan '<qr_payload>'             # Verify a QR payload string
+  gatepassx info -i data.json               # Show statistics
 
-Create a new pass interactively:
-  python -m gatepass_generator new-pass
-
-Validate a pass:
-  python -m gatepass_generator validate path/to/pass.json
+## Environment
+  GATEPASSX_QR_SECRET=your-secret           # Set for signed QR codes
 
 ## Notes
-- Output PDFs will be created in the specified directory.
-- The tool is designed to work together with the Flutter mobile app for data exchange via JSON.
+- PDFs are generated in the output directory.
+- Works with the Flutter mobile app for JSON data interchange.
+- Supports CSV, JSON, and YAML input formats.

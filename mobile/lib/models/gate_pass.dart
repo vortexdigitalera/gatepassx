@@ -3,41 +3,45 @@ import 'package:crypto/crypto.dart' show sha256, Hmac;
 import 'package:intl/intl.dart';
 
 // ignore_for_file: constant_identifier_names
-enum PassCategory { ATTENDEE, VIP, STAFF, SPEAKER, MEDIA, VENDOR }
-enum TripType { SINGLE_DAY, MULTI_DAY, VIP_ACCESS, BACKSTAGE, EXHIBITOR }
+enum PassCategory { GUEST, VIP, STAFF, SPEAKER, PERFORMER, MEDIA, VENDOR, EXHIBITOR }
+enum EventType { DINNER, GALA, CONFERENCE, WEDDING, CONCERT, FESTIVAL, EXHIBITION, CORPORATE, PRIVATE_PARTY, OTHER }
 
 class GatePass {
   final String passId;
+  final String eventName;
+  final EventType eventType;
   final PassCategory category;
   final String fullName;
   final String idNumber;
   final String? phone;
-  final String operator;
-  final TripType? tripType;
+  final String? email;
+  final String organizer;
   final DateTime validFrom;
   final DateTime validTo;
   final String? gate;
+  final String? tableNumber;
   final String? groupRef;
-  final String? vehiclePlate;
   final DateTime issuedAt;
   final String issuedBy;
   String? qrPayload;
 
   GatePass({
     required this.passId,
-    required this.category,
+    this.eventName = 'General Event',
+    this.eventType = EventType.DINNER,
+    this.category = PassCategory.GUEST,
     required this.fullName,
     required this.idNumber,
     this.phone,
-    required this.operator,
-    this.tripType,
+    this.email,
+    this.organizer = 'Event Organizer',
     required this.validFrom,
     required this.validTo,
     this.gate,
+    this.tableNumber,
     this.groupRef,
-    this.vehiclePlate,
     DateTime? issuedAt,
-    this.issuedBy = 'Mobile App',
+    this.issuedBy = 'GatePassX',
   }) : issuedAt = issuedAt ?? DateTime.now();
 
   String get formattedValidity =>
@@ -46,16 +50,17 @@ class GatePass {
   Map<String, dynamic> toVerificationMap() {
     final map = {
       'pid': passId,
+      'ev': eventName,
       'nm': fullName,
       'cat': category.name,
       'idn': idNumber,
-      'op': operator,
+      'org': organizer,
       'vf': DateFormat('yyyy-MM-dd').format(validFrom),
       'vt': DateFormat('yyyy-MM-dd').format(validTo),
       'gt': gate ?? '',
     };
+    if (tableNumber != null && tableNumber!.isNotEmpty) map['tbl'] = tableNumber!;
     if (groupRef != null && groupRef!.isNotEmpty) map['grp'] = groupRef!;
-    if (vehiclePlate != null && vehiclePlate!.isNotEmpty) map['vp'] = vehiclePlate!;
     return map;
   }
 
@@ -73,17 +78,19 @@ class GatePass {
 
   Map<String, dynamic> toJson() => {
         'pass_id': passId,
+        'event_name': eventName,
+        'event_type': eventType.name,
         'category': category.name,
         'full_name': fullName,
         'id_number': idNumber,
         'phone': phone,
-        'operator': operator,
-        'trip_type': tripType?.name,
+        'email': email,
+        'organizer': organizer,
         'valid_from': DateFormat('yyyy-MM-dd').format(validFrom),
         'valid_to': DateFormat('yyyy-MM-dd').format(validTo),
         'gate': gate,
+        'table_number': tableNumber,
         'group_ref': groupRef,
-        'vehicle_plate': vehiclePlate,
         'issued_at': issuedAt.toIso8601String(),
         'issued_by': issuedBy,
         'qr_payload': qrPayload,
@@ -91,27 +98,34 @@ class GatePass {
 
   factory GatePass.fromJson(Map<String, dynamic> json) {
     String norm(String? s) => (s ?? '').toString().toUpperCase();
-    final catStr = norm(json['category'] ?? json['cat'] ?? 'ATTENDEE');
-    final tripStr = norm(json['trip_type'] ?? json['tripType']);
+
+    final catStr = norm(json['category'] ?? json['cat'] ?? 'GUEST');
+    final etStr = norm(json['event_type'] ?? json['eventType'] ?? json['trip_type'] ?? 'DINNER');
+
+    // Legacy field mapping: operator → organizer
+    final organizer = json['organizer'] ?? json['operator'] ?? json['org'] ?? 'Unknown';
+
     return GatePass(
       passId: json['pass_id'] ?? json['pid'] ?? 'UNKNOWN',
+      eventName: json['event_name'] ?? json['ev'] ?? 'General Event',
+      eventType: etStr.isNotEmpty
+          ? EventType.values.firstWhere((e) => e.name.toUpperCase() == etStr, orElse: () => EventType.OTHER)
+          : EventType.DINNER,
       category: PassCategory.values.firstWhere(
           (e) => e.name.toUpperCase() == catStr,
-          orElse: () => PassCategory.ATTENDEE),
+          orElse: () => PassCategory.GUEST),
       fullName: json['full_name'] ?? json['nm'] ?? '',
       idNumber: json['id_number'] ?? json['idn'] ?? '',
       phone: json['phone'],
-      operator: json['operator'] ?? json['op'] ?? 'Unknown Operator',
-      tripType: tripStr.isNotEmpty
-          ? TripType.values.firstWhere((e) => e.name.toUpperCase() == tripStr, orElse: () => TripType.SINGLE_DAY)
-          : null,
-      validFrom: DateTime.tryParse(json['valid_from'] ?? '') ?? DateTime.now(),
-      validTo: DateTime.tryParse(json['valid_to'] ?? '') ?? DateTime.now().add(const Duration(days: 3)),
+      email: json['email'],
+      organizer: organizer,
+      validFrom: DateTime.tryParse(json['valid_from'] ?? json['vf'] ?? '') ?? DateTime.now(),
+      validTo: DateTime.tryParse(json['valid_to'] ?? json['vt'] ?? '') ?? DateTime.now().add(const Duration(days: 3)),
       gate: json['gate'] ?? json['gt'],
+      tableNumber: json['table_number'] ?? json['tbl'],
       groupRef: json['group_ref'] ?? json['grp'],
-      vehiclePlate: json['vehicle_plate'] ?? json['vp'],
       issuedAt: json['issued_at'] != null ? DateTime.tryParse(json['issued_at']) : null,
-      issuedBy: json['issued_by'] ?? 'Mobile App',
+      issuedBy: json['issued_by'] ?? 'GatePassX',
     )..qrPayload = json['qr_payload'];
   }
 }

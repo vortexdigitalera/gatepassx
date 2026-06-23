@@ -25,7 +25,7 @@ else
         -validity 10000 \
         -storepass changeit \
         -keypass changeit \
-        -dname "CN=GatePassX Dev, OU=Engineering, O=AHUON, L=Lagos, C=NG"
+        -dname "CN=GatePassX Dev, OU=Engineering, O=GatePassX, L=Lagos, C=NG"
 
     echo "Keystore generated."
 fi

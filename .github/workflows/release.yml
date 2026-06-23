@@ -143,25 +143,25 @@ jobs:
             exit 1
           }
 
-      - name: Stage APK artifacts
+      - name: Stage APK artifact
         env:
           VERSION: ${{ needs.resolve-version.outputs.version }}
         run: |
           set -euo pipefail
           cp "mobile/build/app/outputs/flutter-apk/app-release.apk" \
-             "gatepassx-android-${VERSION}.apk"
-          ls -lh "gatepassx-android-${VERSION}.apk"
+             "depass-android-${VERSION}.apk"
+          ls -lh "depass-android-${VERSION}.apk"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: android-apk-${{ needs.resolve-version.outputs.version }}
-          path: gatepassx-android-*.apk
+          path: depass-android-*.apk
           if-no-files-found: error
           retention-days: 7
 
   package-python:
-    name: Package Python generator
+    name: Package Python CLI
     needs: resolve-version
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -169,19 +169,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Package Python generator
+      - name: Package Python CLI
         env:
           VERSION: ${{ needs.resolve-version.outputs.version }}
         run: |
           set -euo pipefail
-          PKG_DIR="gatepassx-python-generator-${VERSION}"
+          PKG_DIR="depass-python-cli-${VERSION}"
           mkdir -p "$PKG_DIR"
           cp -r python-generator/* "$PKG_DIR"/
           cp -r sample_data "$PKG_DIR"/ 2>/dev/null || true
           if [ -f python-generator/RELEASE_README.txt ]; then
             cp python-generator/RELEASE_README.txt "$PKG_DIR/README.txt"
           fi
-          ZIP_NAME="gatepassx-python-generator-${VERSION}.zip"
+          ZIP_NAME="depass-python-cli-${VERSION}.zip"
           zip -qr "$ZIP_NAME" "$PKG_DIR"
           ls -lh "$ZIP_NAME"
 
@@ -189,7 +189,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: python-zip-${{ needs.resolve-version.outputs.version }}
-          path: gatepassx-python-generator-*.zip
+          path: depass-python-cli-*.zip
           if-no-files-found: error
           retention-days: 7
 
@@ -235,7 +235,7 @@ jobs:
           else
             echo "Creating release $VERSION"
             gh release create "$VERSION" \
-              --title "GatePassX $VERSION" \
+              --title "DePass $VERSION" \
               --generate-notes \
               "${ASSETS[@]}"
           fi
@@ -243,7 +243,7 @@ jobs:
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: gatepassx-builds-${{ needs.resolve-version.outputs.version }}
+          name: depass-builds-${{ needs.resolve-version.outputs.version }}
           path: dist/*
           if-no-files-found: error
           retention-days: 7

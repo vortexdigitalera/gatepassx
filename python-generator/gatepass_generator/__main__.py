@@ -1,4 +1,4 @@
-"""Allow running as python -m gatepass_generator ..."""
+"""Allow running as: python -m gatepass_generator ..."""
 
 from .cli import cli
 

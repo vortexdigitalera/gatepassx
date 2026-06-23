@@ -1,8 +1,8 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:intl/intl.dart';
 import '../models/gate_pass.dart';
 
@@ -17,50 +17,59 @@ class ScannerScreen extends StatefulWidget {
 }
 
 class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateMixin {
-  final MobileScannerController _controller = MobileScannerController();
+  final MobileScannerController _controller = MobileScannerController(
+    detectionSpeed: DetectionSpeed.normal,
+    facing: CameraFacing.back,
+  );
   final _pasteCtrl = TextEditingController();
-  bool _paused = false;
+  final _beepPlayer = AudioPlayer();
+
+  bool _processing = false;
   bool _torchOn = false;
 
-  late final AnimationController _scanAnimCtrl;
-  late final Animation<double> _scanLine;
+  late final AnimationController _scanLineCtrl;
+  late final Animation<double> _scanLineAnim;
 
-  Rect? _scanWindowRect;
+  Rect? _scanRect;
 
   @override
   void initState() {
     super.initState();
-    _scanAnimCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat(reverse: true);
-    _scanLine = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _scanAnimCtrl, curve: Curves.easeInOutCubic),
+    _scanLineCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
+    _scanLineAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _scanLineCtrl, curve: Curves.easeInOutCubic),
     );
   }
 
   @override
   void dispose() {
-    _scanAnimCtrl.dispose();
+    _scanLineCtrl.dispose();
     _pasteCtrl.dispose();
+    _beepPlayer.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   void _onDetect(BarcodeCapture capture) {
-    if (_paused) return;
+    if (_processing) return;
     for (final barcode in capture.barcodes) {
-      if (barcode.rawValue != null) {
+      if (barcode.rawValue != null && barcode.rawValue!.isNotEmpty) {
         _handleScan(barcode.rawValue!);
         return;
       }
     }
   }
 
-  void _handleScan(String payload) {
-    _paused = true;
+  Future<void> _playFeedback(bool valid) async {
     HapticFeedback.heavyImpact();
-    SystemSound.play(SystemSoundType.click);
+    try {
+      await _beepPlayer.setReleaseMode(ReleaseMode.release);
+      await _beepPlayer.play(AssetSource('sounds/beep.wav'), volume: 1.0);
+    } catch (_) {}
+  }
+
+  void _handleScan(String payload) {
+    _processing = true;
 
     Map<String, dynamic>? data;
     try {
@@ -70,9 +79,10 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     }
 
     final pid = data?['pid'] ?? data?['pass_id'] ?? payload;
-    final match = widget.knownPasses.where((p) => p.passId == pid).isNotEmpty
-        ? widget.knownPasses.firstWhere((p) => p.passId == pid)
-        : null;
+    GatePass? match;
+    for (final p in widget.knownPasses) {
+      if (p.passId == pid) { match = p; break; }
+    }
 
     final now = DateTime.now();
     bool valid = true;
@@ -84,8 +94,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
         reason = 'EXPIRED / NOT YET VALID';
       }
     } else {
-      valid = true;
-      reason = 'UNKNOWN TO LOCAL DB (demo)';
+      reason = 'UNKNOWN PASS';
     }
 
     final log = PassLog(
@@ -96,192 +105,38 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     );
     widget.onAddLog(log);
 
-    if (mounted) _showResultDialog(valid, reason, match, pid);
+    _playFeedback(valid);
+
+    if (mounted) _showResult(valid, reason, match, pid);
   }
 
-  void _showResultDialog(bool valid, String reason, GatePass? match, String pid) {
-    showGeneralDialog(
+  void _showResult(bool valid, String reason, GatePass? match, String pid) {
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      barrierLabel: '',
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (ctx, anim1, anim2) => const SizedBox(),
-      transitionBuilder: (ctx, anim, secondaryAnim, child) {
-        return FadeTransition(
-          opacity: anim,
-          child: ScaleTransition(
-            scale: CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
-            child: AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              contentPadding: EdgeInsets.zero,
-              clipBehavior: Clip.antiAlias,
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: valid
-                            ? [const Color(0xFF1B7A1B), const Color(0xFF2E7D32)]
-                            : [const Color(0xFFB71C1C), const Color(0xFFC62828)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0.0, end: 1.0),
-                          duration: const Duration(milliseconds: 400),
-                          builder: (ctx, val, _) => Transform.scale(
-                            scale: val,
-                            child: Icon(
-                              valid ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                              color: Colors.white,
-                              size: 72,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          valid ? 'ACCESS GRANTED' : 'ACCESS DENIED',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        if (reason != 'OK')
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(reason, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14)),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (match != null) ...[
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: valid ? const Color(0xFF2E7D32).withValues(alpha: 0.1) : const Color(0xFFC62828).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(Icons.person_rounded, color: valid ? const Color(0xFF2E7D32) : const Color(0xFFC62828), size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(match.fullName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                                Text(match.passId, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                              ],
-                            ),
-                          ),
-                          _buildCategoryChip(match.category.name),
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 24, indent: 20, endIndent: 20),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                      child: Column(
-                        children: [
-                          _infoRow(Icons.assignment_ind_outlined, 'ID', match.idNumber),
-                          if (match.phone != null && match.phone!.isNotEmpty)
-                            _infoRow(Icons.phone_outlined, 'Phone', match.phone!),
-                          _infoRow(Icons.business_outlined, 'Operator', match.operator),
-                          if (match.gate != null && match.gate!.isNotEmpty)
-                            _infoRow(Icons.location_on_outlined, 'Gate', match.gate!),
-                          _infoRow(Icons.date_range_outlined, 'Valid', '${_fmt(match.validFrom)} — ${_fmt(match.validTo)}'),
-                          if (match.tripType != null)
-                            _infoRow(Icons.map_outlined, 'Trip', match.tripType!.name),
-                        ],
-                      ),
-                    ),
-                  ] else ...[
-                    Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text('Pass ID: $pid', style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                ],
-              ),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('CLOSE', style: TextStyle(letterSpacing: 0.5)),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            if (mounted) setState(() => _paused = false);
-                          },
-                          icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
-                          label: const Text('SCAN AGAIN'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF006400),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      transitionAnimationController: AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 350),
+      ),
+      builder: (ctx) => _ResultSheet(
+        valid: valid,
+        reason: reason,
+        match: match,
+        pid: pid,
+        onScanAgain: () {
+          Navigator.pop(ctx);
+          setState(() => _processing = false);
+        },
+        onClose: () {
+          Navigator.pop(ctx);
+          setState(() => _processing = false);
+        },
+      ),
     ).then((_) {
-      if (mounted) setState(() => _paused = false);
+      if (mounted) setState(() => _processing = false);
     });
   }
-
-  Widget _buildCategoryChip(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF006400).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF006400))),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: Colors.grey.shade500),
-          const SizedBox(width: 8),
-          SizedBox(width: 60, child: Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade500))),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
-        ],
-      ),
-    );
-  }
-
-  String _fmt(DateTime d) => DateFormat('dd MMM yyyy').format(d);
 
   void _manualSubmit(String val) {
     if (val.trim().isNotEmpty) {
@@ -292,241 +147,441 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final w = constraints.maxWidth;
-        final scanSize = w * 0.7;
+        final h = constraints.maxHeight;
+        final scanSize = w * 0.68;
         final left = (w - scanSize) / 2;
-        final top = (constraints.maxHeight - scanSize) / 2 - 40;
-        _scanWindowRect = Rect.fromLTWH(left, top, scanSize, scanSize);
+        final top = h * 0.22;
+        _scanRect = Rect.fromLTWH(left, top, scanSize, scanSize);
 
-        return Stack(
-          children: [
-            MobileScanner(
-              controller: _controller,
-              onDetect: _onDetect,
-              fit: BoxFit.cover,
-              scanWindow: _scanWindowRect,
-              overlayBuilder: (ctx, cons) {
-                return Stack(
-                  children: [
-                    // Dark overlay with cutout
-                    CustomPaint(
-                      size: cons.biggest,
-                      painter: _ScannerOverlayPainter(
-                        scanRect: _scanWindowRect!,
-                        cornerColor: const Color(0xFF006400),
-                      ),
-                    ),
-                    // Corner decoration
-                    Positioned(
-                      left: left - 4,
-                      top: top - 4,
-                      child: _CornerDecoration(size: scanSize + 8),
-                    ),
-                    // Scan line
-                    Positioned(
-                      left: left + 4,
-                      top: top + 4 + _scanLine.value * (scanSize - 8),
-                      child: Container(
-                        width: scanSize - 8,
-                        height: 2,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.transparent,
-                              const Color(0xFF006400).withValues(alpha: 0.8),
-                              const Color(0xFFFFB300),
-                              const Color(0xFF006400).withValues(alpha: 0.8),
-                              Colors.transparent,
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              // Full camera feed
+              MobileScanner(
+                controller: _controller,
+                onDetect: _onDetect,
+                fit: BoxFit.cover,
+                scanWindow: _scanRect,
+                overlayBuilder: (ctx, cons) => _buildOverlay(cons, cs),
+                placeholderBuilder: (_) => const ColoredBox(
+                  color: Colors.black,
+                  child: Center(child: CircularProgressIndicator(color: Colors.white)),
+                ),
+              ),
+
+              // Top safe area — header
+              Positioned(
+                top: 0, left: 0, right: 0,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: [
+                        // Back hint
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 18),
+                              const SizedBox(width: 6),
+                              const Text('SCANNER', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1)),
                             ],
-                            stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
                           ),
                         ),
-                      ),
-                    ),
-                    // Torch button
-                    Positioned(
-                      bottom: 120,
-                      left: 0,
-                      right: 0,
-                      child: Center(
-                        child: ValueListenableBuilder<MobileScannerState>(
+                        const Spacer(),
+                        // Torch toggle
+                        ValueListenableBuilder<MobileScannerState>(
                           valueListenable: _controller,
                           builder: (ctx, state, _) {
                             if (!state.isInitialized) return const SizedBox();
-                            return GestureDetector(
-                              onTap: () {
-                                _torchOn = !_torchOn;
+                            return IconButton(
+                              onPressed: () {
+                                setState(() => _torchOn = !_torchOn);
                                 _controller.toggleTorch();
                               },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      _torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                                      color: _torchOn ? const Color(0xFFFFB300) : Colors.white,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      _torchOn ? 'TORCH ON' : 'TORCH OFF',
-                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12, letterSpacing: 0.5),
-                                    ),
-                                  ],
-                                ),
+                              icon: Icon(
+                                _torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                                color: _torchOn ? cs.tertiary : Colors.white70,
+                              ),
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.black.withValues(alpha: 0.45),
                               ),
                             );
                           },
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                );
-              },
-              placeholderBuilder: (ctx) => const ColoredBox(
-                color: Colors.black,
-                child: Center(child: CircularProgressIndicator(color: Colors.white)),
-              ),
-            ),
-            // Header
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 8,
-              left: 0,
-              right: 0,
-              child: Column(
-                children: [
-                  const Text('Scan QR Code', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 0.3)),
-                  const SizedBox(height: 4),
-                  Text('Point camera at AHUON gate pass QR', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13)),
-                ],
-              ),
-            ),
-            // Paste field
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: MediaQuery.of(context).padding.bottom + 20,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                ),
-                child: Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 14),
-                      child: Icon(Icons.paste_rounded, color: Colors.white.withValues(alpha: 0.5), size: 20),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: _pasteCtrl,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: 'Or paste QR payload / Pass ID',
-                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-                        ),
-                        onSubmitted: _manualSubmit,
-                      ),
-                    ),
-                    if (_pasteCtrl.text.isNotEmpty)
-                      IconButton(
-                        icon: Icon(Icons.send_rounded, color: const Color(0xFF006400), size: 20),
-                        onPressed: () => _manualSubmit(_pasteCtrl.text),
-                      ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-            // Paused overlay
-            if (_paused)
-              Container(color: Colors.black.withValues(alpha: 0.6)),
-          ],
+
+              // Instruction text below scan frame
+              Positioned(
+                left: 0, right: 0,
+                top: top + scanSize + 20,
+                child: Center(
+                  child: Text(
+                    'Point camera at QR code',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                  ),
+                ),
+              ),
+
+              // Paste field at bottom
+              Positioned(
+                left: 16, right: 16,
+                bottom: MediaQuery.of(context).padding.bottom + 12,
+                child: _buildPasteField(cs),
+              ),
+
+              // Processing overlay
+              if (_processing)
+                Container(color: Colors.black.withValues(alpha: 0.5)),
+            ],
+          ),
         );
       },
     );
   }
+
+  Widget _buildOverlay(BoxConstraints cons, ColorScheme cs) {
+    final rect = _scanRect!;
+    return Stack(
+      children: [
+        // Darkened overlay with cutout
+        CustomPaint(
+          size: cons.biggest,
+          painter: _OverlayPainter(rect, cs),
+        ),
+        // Animated scan line
+        AnimatedBuilder(
+          animation: _scanLineAnim,
+          builder: (ctx, _) => Positioned(
+            left: rect.left + 6,
+            top: rect.top + 6 + _scanLineAnim.value * (rect.height - 12),
+            child: Container(
+              width: rect.width - 12,
+              height: 2,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    cs.primary.withValues(alpha: 0.9),
+                    cs.tertiary.withValues(alpha: 0.9),
+                    cs.primary.withValues(alpha: 0.9),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPasteField(ColorScheme cs) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Icon(Icons.paste_rounded, color: Colors.white38, size: 18),
+          ),
+          Expanded(
+            child: TextField(
+              controller: _pasteCtrl,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Paste QR / Pass ID',
+                hintStyle: const TextStyle(color: Colors.white24),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+              ),
+              onSubmitted: _manualSubmit,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: IconButton(
+              icon: Icon(Icons.send_rounded, color: cs.tertiary, size: 20),
+              onPressed: () => _manualSubmit(_pasteCtrl.text),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: 0.1),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _ScannerOverlayPainter extends CustomPainter {
-  final Rect scanRect;
-  final Color cornerColor;
+// ── Result Bottom Sheet ──────────────────────────────────────────────────────
 
-  _ScannerOverlayPainter({required this.scanRect, required this.cornerColor});
+class _ResultSheet extends StatelessWidget {
+  final bool valid;
+  final String reason;
+  final GatePass? match;
+  final String pid;
+  final VoidCallback onScanAgain;
+  final VoidCallback onClose;
+
+  const _ResultSheet({
+    required this.valid,
+    required this.reason,
+    required this.match,
+    required this.pid,
+    required this.onScanAgain,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final statusColor = valid ? Colors.green : Colors.red;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              margin: const EdgeInsets.only(top: 10),
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Status icon
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 450),
+              curve: Curves.elasticOut,
+              builder: (ctx, val, _) => Transform.scale(
+                scale: val,
+                child: Icon(
+                  valid ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                  color: statusColor,
+                  size: 72,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Status text
+            Text(
+              valid ? 'ACCESS GRANTED' : 'ACCESS DENIED',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: statusColor,
+                letterSpacing: 0.5,
+              ),
+            ),
+            if (reason != 'OK') ...[
+              const SizedBox(height: 4),
+              Text(reason, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+            ],
+            const SizedBox(height: 16),
+
+            // Pass details
+            if (match != null)
+              _buildMatchDetails(context, cs)
+            else
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: cs.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Text('Pass ID: $pid', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 16),
+
+            // Action buttons
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onClose,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('CLOSE'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed: onScanAgain,
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                      label: const Text('SCAN AGAIN'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMatchDetails(BuildContext context, ColorScheme cs) {
+    final m = match!;
+    final statusColor = valid ? Colors.green : Colors.red;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          // Name row
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: statusColor.withValues(alpha: 0.1),
+                child: Icon(Icons.person_rounded, color: statusColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(m.fullName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    Text(m.passId, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              Chip(
+                label: Text(m.category.name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Divider(height: 1, color: cs.outlineVariant),
+          const SizedBox(height: 8),
+          _infoRow(Icons.event_outlined, 'Event', m.eventName, cs),
+          _infoRow(Icons.assignment_ind_outlined, 'ID', m.idNumber, cs),
+          if (m.phone != null && m.phone!.isNotEmpty)
+            _infoRow(Icons.phone_outlined, 'Phone', m.phone!, cs),
+          _infoRow(Icons.business_outlined, 'Organizer', m.organizer, cs),
+          if (m.gate != null && m.gate!.isNotEmpty)
+            _infoRow(Icons.location_on_outlined, 'Gate', m.gate!, cs),
+          if (m.tableNumber != null && m.tableNumber!.isNotEmpty)
+            _infoRow(Icons.table_restaurant_outlined, 'Table', m.tableNumber!, cs),
+          _infoRow(Icons.date_range_outlined, 'Valid',
+              '${DateFormat('dd MMM yyyy').format(m.validFrom)} — ${DateFormat('dd MMM yyyy').format(m.validTo)}', cs),
+          _infoRow(Icons.category_outlined, 'Type', m.eventType.name, cs),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value, ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: cs.onSurfaceVariant),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 68,
+            child: Text(label, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Overlay Painter ──────────────────────────────────────────────────────────
+
+class _OverlayPainter extends CustomPainter {
+  final Rect scanRect;
+  final ColorScheme cs;
+
+  _OverlayPainter(this.scanRect, this.cs);
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Dark background
-    final bgPaint = Paint()..color = Colors.black.withValues(alpha: 0.5);
+    final bg = Paint()..color = Colors.black.withValues(alpha: 0.55);
     canvas.drawPath(
       Path.combine(
         PathOperation.difference,
         Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)),
-        Path()..addRRect(RRect.fromRectAndRadius(scanRect, const Radius.circular(16))),
+        Path()..addRRect(RRect.fromRectAndRadius(scanRect, const Radius.circular(20))),
       ),
-      bgPaint,
+      bg,
     );
-  }
 
-  @override
-  bool shouldRepaint(covariant _ScannerOverlayPainter oldDelegate) => oldDelegate.scanRect != scanRect;
-}
-
-class _CornerDecoration extends StatelessWidget {
-  final double size;
-  const _CornerDecoration({required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(
-        painter: _CornerPainter(),
-        size: Size(size, size),
-      ),
-    );
-  }
-}
-
-class _CornerPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
+    // Corner brackets
     final paint = Paint()
-      ..color = const Color(0xFF006400)
+      ..color = cs.primary
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
+      ..strokeWidth = 3.5
       ..strokeCap = StrokeCap.round;
 
-    final r = 12.0;
-    final len = 24.0;
+    final r = 14.0;
+    final len = 28.0;
+    final l = scanRect.left, t = scanRect.top, ri = scanRect.right, b = scanRect.bottom;
 
-    // Top-left corner
-    canvas.drawLine(Offset(r, 0), Offset(r + len, 0), paint);
-    canvas.drawLine(Offset(0, r), Offset(0, r + len), paint);
-
-    // Top-right
-    canvas.drawLine(Offset(size.width - r - len, 0), Offset(size.width - r, 0), paint);
-    canvas.drawLine(Offset(size.width, r), Offset(size.width, r + len), paint);
-
-    // Bottom-left
-    canvas.drawLine(Offset(r, size.height), Offset(r + len, size.height), paint);
-    canvas.drawLine(Offset(0, size.height - r - len), Offset(0, size.height - r), paint);
-
-    // Bottom-right
-    canvas.drawLine(Offset(size.width - r - len, size.height), Offset(size.width - r, size.height), paint);
-    canvas.drawLine(Offset(size.width, size.height - r - len), Offset(size.width, size.height - r), paint);
+    canvas.drawLine(Offset(l + r, t), Offset(l + r + len, t), paint);
+    canvas.drawLine(Offset(l, t + r), Offset(l, t + r + len), paint);
+    canvas.drawLine(Offset(ri - r - len, t), Offset(ri - r, t), paint);
+    canvas.drawLine(Offset(ri, t + r), Offset(ri, t + r + len), paint);
+    canvas.drawLine(Offset(l + r, b), Offset(l + r + len, b), paint);
+    canvas.drawLine(Offset(l, b - r - len), Offset(l, b - r), paint);
+    canvas.drawLine(Offset(ri - r - len, b), Offset(ri - r, b), paint);
+    canvas.drawLine(Offset(ri, b - r - len), Offset(ri, b - r), paint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _OverlayPainter old) => old.scanRect != scanRect;
 }

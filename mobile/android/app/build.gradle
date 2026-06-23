@@ -25,7 +25,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace = "com.rabyte.gpxadmin"
+    namespace = "com.rabyte.depass"
     compileSdk = 36
     ndkVersion = "27.0.12077973"
 
@@ -39,7 +39,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.rabyte.gpxadmin"
+        applicationId = "com.rabyte.depass"
         minSdk = Math.max(flutter.minSdkVersion ?: 21, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutterVersionCode.toInteger()
