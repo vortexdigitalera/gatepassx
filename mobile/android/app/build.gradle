@@ -1,13 +1,8 @@
 plugins {
     id "com.android.application"
     id "kotlin-android"
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
 }
-
-// GatePassX release signing: use real RELEASE signing key (from env or key.properties) when available.
-// Falls back to debug key only to allow local `flutter build apk --release` without a keystore.
-apply from: rootProject.file('signing.gradle')
 
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file("local.properties")
@@ -49,28 +44,9 @@ android {
         versionName = "2026.07.22"
     }
 
-    signingConfigs {
-        release {
-            def cfg = configureReleaseSigning()
-            if (cfg != null) {
-                storeFile = cfg.storeFile
-                storePassword = cfg.storePassword
-                keyAlias = cfg.keyAlias
-                keyPassword = cfg.keyPassword
-                println "GatePassX: RELEASE signing key enabled from env/key.properties"
-            } else {
-                storeFile = signingConfigs.debug.storeFile
-                storePassword = signingConfigs.debug.storePassword
-                keyAlias = signingConfigs.debug.keyAlias
-                keyPassword = signingConfigs.debug.keyPassword
-                println "GatePassX: no RELEASE signing — using debug (local only)"
-            }
-        }
-    }
-
     buildTypes {
         release {
-            signingConfig = signingConfigs.release
+            signingConfig = signingConfigs.debug
         }
     }
 }
