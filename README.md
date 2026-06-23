@@ -141,6 +141,28 @@ The workflow will produce and attach to the GitHub Release:
 
 See [.github/workflows/release.yml](.github/workflows/release.yml) for details. All CI builds also force Gradle + Pub + Flutter build outputs into temp storage.
 
+**Important: RELEASE signing key (not debug)**
+
+For the "Build and Release" workflow to produce a properly signed release APK (ready for distribution, not debug-signed):
+
+1. Generate a release keystore once (outside the repo):
+   ```bash
+   keytool -genkey -v -keystore release-keystore.jks -alias upload \
+     -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. Base64 encode:
+   ```bash
+   base64 -w0 release-keystore.jks > keystore.b64   # copy contents
+   ```
+3. In GitHub repo: Settings → Secrets and variables → Actions, add:
+   - `ANDROID_RELEASE_KEYSTORE_BASE64` (paste base64)
+   - `ANDROID_RELEASE_KEYSTORE_PASSWORD`
+   - `ANDROID_RELEASE_KEY_ALIAS` (e.g. `upload`)
+   - `ANDROID_RELEASE_KEY_PASSWORD`
+   The workflow will fail early with clear error if these are missing (ensures real signing key is always used for releases).
+
+See `mobile/android/key.properties.example` and `scripts/setup-android-signing.sh` (for local dev keystores).
+
 ### Python Generator
 ```bash
 # After activating the /tmp venv (see above)

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # setup-android-signing.sh
-# Generate a development Android keystore and configure key.properties for GatePassX.
+# Generate a DEVELOPMENT Android keystore + key.properties (for local testing).
+# This produces a debug-like key. For real releases use a separate long-lived RELEASE keystore + CI secrets.
 #
-# For production, use a real keystore and set environment variables in CI instead.
+# For production RELEASE builds in CI, configure the ANDROID_RELEASE_* secrets instead (see README).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -15,7 +16,7 @@ if [ -f "$KEYSTORE_FILE" ]; then
     echo "Keystore already exists at $KEYSTORE_FILE"
     echo "To regenerate, delete it first: rm $KEYSTORE_FILE"
 else
-    echo "Generating development keystore at $KEYSTORE_FILE ..."
+    echo "Generating DEVELOPMENT keystore at $KEYSTORE_FILE ..."
     keytool -genkey -v \
         -keystore "$KEYSTORE_FILE" \
         -alias upload \
@@ -42,6 +43,5 @@ PROPS
 fi
 
 echo ""
-echo "Done! You can now run: flutter build apk --release"
-echo "For CI, set the following environment variables instead:"
-echo "  ANDROID_KEYSTORE_PATH  ANDROID_KEYSTORE_PASSWORD  ANDROID_KEY_ALIAS  ANDROID_KEY_PASSWORD"
+echo "Done. Local: flutter build apk --release  (will use this dev key via key.properties)"
+echo "For real RELEASE key in CI: set ANDROID_RELEASE_KEYSTORE_BASE64 + password secrets (see README.md)"
