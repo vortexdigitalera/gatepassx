@@ -85,6 +85,13 @@ jobs:
           gradle-version: wrapper
           cache-disabled: true
 
+      - name: Clean Gradle jars cache after restore (fix bcprov creation)
+        run: |
+          export GRADLE_USER_HOME="${{ runner.temp }}/.gradle"
+          rm -rf "$GRADLE_USER_HOME/caches/jars-"* 2>/dev/null || true
+          rm -rf "$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle" 2>/dev/null || true
+          echo "Cleaned jars caches"
+
       - name: Pre-accept SDK licenses (early hack to avoid fetch/compute hangs)
         run: |
           # Pre-write to user-writable locations before the action installs.
