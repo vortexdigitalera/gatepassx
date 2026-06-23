@@ -146,6 +146,13 @@ jobs:
           echo "Pub cache: $PUB_CACHE"
           df -h /tmp
 
+      - name: Clean Gradle JAR caches (prevent bcprov "Failed to create Jar file" + mobile_scanner android property error)
+        run: |
+          export GRADLE_USER_HOME=${{ runner.temp }}/.gradle
+          rm -rf "$GRADLE_USER_HOME/caches/jars-"* 2>/dev/null || true
+          rm -rf "$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle" 2>/dev/null || true
+          echo "JAR caches cleaned before build"
+
       # === RELEASE signing key (optional — falls back to debug if secrets not set) ===
       - name: Prepare Android RELEASE signing key
         id: signing
@@ -198,9 +205,13 @@ jobs:
           echo "Building APK versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
           echo "Keystore: ${ANDROID_KEYSTORE_PATH:-<none — will use debug>}"
 
-          # Strong clean for persistent "Failed to create Jar file" (bcprov) on GitHub runners with mobile_scanner
-          rm -rf "$GRADLE_USER_HOME/caches" 2>/dev/null || true
-          mkdir -p "$GRADLE_USER_HOME/caches"
+          flutter clean
+          flutter pub get
+
+          # Extra clean right before assemble (caches may have been restored by gradle action)
+          export GRADLE_USER_HOME=${{ runner.temp }}/.gradle
+          rm -rf "$GRADLE_USER_HOME/caches/jars-"* 2>/dev/null || true
+          rm -rf "$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle" 2>/dev/null || true
 
           flutter build apk --release \
             --build-name "$VERSION_NAME" \
