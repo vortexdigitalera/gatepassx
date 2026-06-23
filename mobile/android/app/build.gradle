@@ -48,7 +48,7 @@ android {
 
     signingConfigs {
         release {
-            def cfg = configureReleaseSigning()
+            def cfg = project.ext.configureReleaseSigning()
             if (cfg != null) {
                 storeFile = cfg.storeFile
                 storePassword = cfg.storePassword
