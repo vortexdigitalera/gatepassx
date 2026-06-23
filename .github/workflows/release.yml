@@ -153,7 +153,7 @@ jobs:
           echo "Building APK with versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
 
           flutter build apk --release \
-            --build-name "2026.07.22" \
+            --build-name "$VERSION_NAME" \
             --build-number "$BUILD_NUMBER"
 
           # Verify the artifact was produced (standard location)
