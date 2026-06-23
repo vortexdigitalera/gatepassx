@@ -35,7 +35,7 @@ class DashboardScreen extends StatelessWidget {
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(24),
-              boxShadow: [BoxShadow(color: cs.primary.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))],
+              boxShadow: [BoxShadow(color: cs.primary.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8))],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,7 +45,7 @@ class DashboardScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.door_sliding_outlined, color: Colors.white, size: 24),
@@ -188,7 +188,7 @@ class _StatCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
@@ -196,7 +196,7 @@ class _StatCard extends StatelessWidget {
             Icon(icon, color: color, size: 20),
             const SizedBox(height: 4),
             Text(value, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-            Text(label, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10)),
+            Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 10)),
           ],
         ),
       ),
@@ -228,7 +228,7 @@ class _ActionCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 24),
@@ -262,7 +262,7 @@ class _ActivityCard extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
@@ -275,10 +275,10 @@ class _ActivityCard extends StatelessWidget {
         subtitle: Text(DateFormat.yMd().add_jm().format(log.timestamp), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: log.valid ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
+           decoration: BoxDecoration(
+             color: log.valid ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+             borderRadius: BorderRadius.circular(8),
+           ),
           child: Text(
             log.valid ? 'VALID' : 'INVALID',
             style: TextStyle(

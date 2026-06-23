@@ -3,11 +3,12 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../models/gate_pass.dart';
 
 final _catColors = {
-  PassCategory.PILGRIM: const Color(0xFF1B7A1B),
-  PassCategory.STAFF: const Color(0xFF1565C0),
-  PassCategory.VEHICLE: const Color(0xFFE65100),
-  PassCategory.VISITOR: const Color(0xFF7B1FA2),
+  PassCategory.ATTENDEE: const Color(0xFF1B7A1B),
   PassCategory.VIP: const Color(0xFFFFB300),
+  PassCategory.STAFF: const Color(0xFF1565C0),
+  PassCategory.SPEAKER: const Color(0xFF7B1FA2),
+  PassCategory.MEDIA: const Color(0xFFE65100),
+  PassCategory.VENDOR: const Color(0xFF00ACC1),
 };
 
 class PassesScreen extends StatefulWidget {
@@ -67,7 +68,7 @@ class _PassesScreenState extends State<PassesScreen> {
           margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
           ),
           child: TextField(
             controller: _searchCtrl,
@@ -146,7 +147,7 @@ class _PassCard extends StatelessWidget {
                 width: 48, height: 48,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [catColor.withOpacity(0.2), catColor.withOpacity(0.05)],
+                    colors: [catColor.withValues(alpha: 0.2), catColor.withValues(alpha: 0.05)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -174,10 +175,10 @@ class _PassCard extends StatelessWidget {
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: isValid ? const Color(0xFF2E7D32).withOpacity(0.1) : const Color(0xFFC62828).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                  decoration: BoxDecoration(
+                    color: isValid ? const Color(0xFF2E7D32).withValues(alpha: 0.1) : const Color(0xFFC62828).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 child: Text(
                   isValid ? 'VALID' : 'EXPIRED',
                   style: TextStyle(
@@ -235,7 +236,7 @@ class _PassCard extends StatelessWidget {
                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
                     ),
                     const SizedBox(height: 4),
-                    Text(pass.passId, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
+                    Text(pass.passId, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12)),
                   ],
                 ),
               ),

@@ -31,16 +31,20 @@ def _get_qr_secret() -> str:
 
 
 class TripType(str, Enum):
-    HAJJ = "HAJJ"
-    UMRAH = "UMRAH"
+    SINGLE_DAY = "SINGLE_DAY"
+    MULTI_DAY = "MULTI_DAY"
+    VIP_ACCESS = "VIP_ACCESS"
+    BACKSTAGE = "BACKSTAGE"
+    EXHIBITOR = "EXHIBITOR"
 
 
 class PassCategory(str, Enum):
-    PILGRIM = "PILGRIM"
-    STAFF = "STAFF"
-    VEHICLE = "VEHICLE"
-    VISITOR = "VISITOR"
+    ATTENDEE = "ATTENDEE"
     VIP = "VIP"
+    STAFF = "STAFF"
+    SPEAKER = "SPEAKER"
+    MEDIA = "MEDIA"
+    VENDOR = "VENDOR"
 
 
 class GatePass(BaseModel):

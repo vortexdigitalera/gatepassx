@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -15,6 +16,7 @@ import 'screens/scanner_screen.dart';
 import 'screens/logs_screen.dart';
 
 final theme = ThemeData(
+  textTheme: GoogleFonts.bricolageGrotesqueTextTheme(),
   useMaterial3: true,
   colorScheme: ColorScheme.fromSeed(
     seedColor: const Color(0xFF006400),
@@ -30,9 +32,9 @@ final theme = ThemeData(
     backgroundColor: Color(0xFF006400),
     foregroundColor: Colors.white,
   ),
-  cardTheme: CardTheme(
+  cardTheme: CardThemeData(
     elevation: 2,
-    shadowColor: const Color(0xFF006400).withOpacity(0.15),
+    shadowColor: const Color(0xFF006400).withValues(alpha: 0.15),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
   ),
@@ -70,7 +72,7 @@ final theme = ThemeData(
   navigationBarTheme: NavigationBarThemeData(
     elevation: 8,
     shadowColor: Colors.black26,
-    indicatorColor: const Color(0xFF006400).withOpacity(0.12),
+    indicatorColor: const Color(0xFF006400).withValues(alpha: 0.12),
     backgroundColor: Colors.white,
     labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
   ),
@@ -160,7 +162,7 @@ class _GatePassHomeState extends State<GatePassHome> with TickerProviderStateMix
   }
 
   Future<void> _importPasses() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json', 'csv'],
       withData: true,
@@ -234,7 +236,7 @@ class _GatePassHomeState extends State<GatePassHome> with TickerProviderStateMix
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.app_registration, size: 20),
@@ -292,7 +294,7 @@ class _GatePassHomeState extends State<GatePassHome> with TickerProviderStateMix
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 4))],
+           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 4))],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
@@ -341,7 +343,7 @@ class _AppBarAction extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(right: 2),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(10),
       ),
       child: IconButton(

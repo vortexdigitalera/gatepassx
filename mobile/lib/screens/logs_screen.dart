@@ -41,7 +41,7 @@ class LogsScreen extends StatelessWidget {
             leading: Container(
               width: 44, height: 44,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(icon, color: color, size: 22),
@@ -50,10 +50,10 @@ class LogsScreen extends StatelessWidget {
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
+                   decoration: BoxDecoration(
+                     color: color.withValues(alpha: 0.1),
+                     borderRadius: BorderRadius.circular(6),
+                   ),
                   child: Text(l.action, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
                 ),
                 const SizedBox(width: 8),
@@ -73,7 +73,7 @@ class LogsScreen extends StatelessWidget {
                 ? Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.05),
+                      color: Colors.red.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(l.notes!, style: TextStyle(fontSize: 9, color: Colors.red.shade400)),

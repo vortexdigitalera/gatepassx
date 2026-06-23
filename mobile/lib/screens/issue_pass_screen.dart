@@ -20,24 +20,25 @@ class _IssuePassScreenState extends State<IssuePassScreen> {
   final _nameCtrl = TextEditingController();
   final _idCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  final _operatorCtrl = TextEditingController(text: 'Al-Mufid Travels');
-  final _gateCtrl = TextEditingController(text: 'Lagos Hajj Camp Gate A');
+  final _operatorCtrl = TextEditingController(text: 'Event Organizer');
+  final _gateCtrl = TextEditingController(text: 'Main Gate');
   final _groupCtrl = TextEditingController();
   final _vehicleCtrl = TextEditingController();
 
-  PassCategory _category = PassCategory.PILGRIM;
-  TripType? _tripType = TripType.HAJJ;
+  PassCategory _category = PassCategory.ATTENDEE;
+  TripType? _tripType = TripType.SINGLE_DAY;
   DateTime _validFrom = DateTime.now();
-  DateTime _validTo = DateTime.now().add(const Duration(days: 25));
+  DateTime _validTo = DateTime.now().add(const Duration(days: 3));
 
   GatePass? _generatedPass;
 
   final _catColors = {
-    PassCategory.PILGRIM: const Color(0xFF1B7A1B),
-    PassCategory.STAFF: const Color(0xFF1565C0),
-    PassCategory.VEHICLE: const Color(0xFFE65100),
-    PassCategory.VISITOR: const Color(0xFF7B1FA2),
+    PassCategory.ATTENDEE: const Color(0xFF1B7A1B),
     PassCategory.VIP: const Color(0xFFFFB300),
+    PassCategory.STAFF: const Color(0xFF1565C0),
+    PassCategory.SPEAKER: const Color(0xFF7B1FA2),
+    PassCategory.MEDIA: const Color(0xFFE65100),
+    PassCategory.VENDOR: const Color(0xFF00ACC1),
   };
 
   @override
@@ -56,7 +57,7 @@ class _IssuePassScreenState extends State<IssuePassScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final pass = GatePass(
-      passId: 'AHUON-${_tripType?.name ?? "GEN"}-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
+      passId: 'EVT-${_tripType?.name ?? "GEN"}-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
       category: _category,
       fullName: _nameCtrl.text.trim(),
       idNumber: _idCtrl.text.trim(),
@@ -134,21 +135,21 @@ class _IssuePassScreenState extends State<IssuePassScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [catColor.withOpacity(0.1), catColor.withOpacity(0.05)],
+                  colors: [catColor.withValues(alpha: 0.1), catColor.withValues(alpha: 0.05)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: catColor.withOpacity(0.15)),
+                border: Border.all(color: catColor.withValues(alpha: 0.15)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: catColor.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                      decoration: BoxDecoration(
+                        color: catColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     child: Icon(Icons.assignment_outlined, color: catColor, size: 28),
                   ),
                   const SizedBox(width: 14),
@@ -208,7 +209,7 @@ class _IssuePassScreenState extends State<IssuePassScreen> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<PassCategory>(
-                    value: _category,
+                    initialValue: _category,
                     decoration: InputDecoration(
                       labelText: 'Category',
                       prefixIcon: Padding(
@@ -235,7 +236,7 @@ class _IssuePassScreenState extends State<IssuePassScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButtonFormField<TripType?>(
-                    value: _tripType,
+                    initialValue: _tripType,
                     decoration: InputDecoration(
                       labelText: 'Trip',
                       prefixIcon: Padding(
@@ -308,16 +309,14 @@ class _IssuePassScreenState extends State<IssuePassScreen> {
                 prefixIcon: Icon(Icons.flight_outlined, color: Colors.grey.shade400),
               ),
             ),
-            if (_category == PassCategory.VEHICLE) ...[
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _vehicleCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Vehicle Plate',
-                  prefixIcon: Icon(Icons.directions_car_outlined, color: Colors.grey.shade400),
-                ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _vehicleCtrl,
+              decoration: InputDecoration(
+                labelText: 'Vehicle Plate (optional)',
+                prefixIcon: Icon(Icons.directions_car_outlined, color: Colors.grey.shade400),
               ),
-            ],
+            ),
             const SizedBox(height: 24),
 
             // Generate button
@@ -325,7 +324,7 @@ class _IssuePassScreenState extends State<IssuePassScreen> {
               height: 54,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: catColor.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))],
+                boxShadow: [BoxShadow(color: catColor.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
               ),
               child: ElevatedButton.icon(
                 onPressed: _generateAndSave,
@@ -347,8 +346,8 @@ class _IssuePassScreenState extends State<IssuePassScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF006400).withOpacity(0.15)),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 20, offset: const Offset(0, 4))],
+                  border: Border.all(color: const Color(0xFF006400).withValues(alpha: 0.15)),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 20, offset: const Offset(0, 4))],
                 ),
                 child: Column(
                   children: [
@@ -357,7 +356,7 @@ class _IssuePassScreenState extends State<IssuePassScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: catColor.withOpacity(0.1),
+                            color: catColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(_generatedPass!.category.name, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: catColor)),
@@ -387,14 +386,14 @@ class _IssuePassScreenState extends State<IssuePassScreen> {
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: catColor.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Valid: ${_generatedPass!.formattedValidity}',
-                        style: TextStyle(fontSize: 12, color: catColor.withOpacity(0.8)),
-                      ),
+                       decoration: BoxDecoration(
+                         color: catColor.withValues(alpha: 0.08),
+                         borderRadius: BorderRadius.circular(8),
+                       ),
+                       child: Text(
+                         'Valid: ${_generatedPass!.formattedValidity}',
+                         style: TextStyle(fontSize: 12, color: catColor.withValues(alpha: 0.8)),
+                       ),
                     ),
                     const SizedBox(height: 16),
                     Row(

@@ -3,8 +3,8 @@ import 'package:crypto/crypto.dart' show sha256, Hmac;
 import 'package:intl/intl.dart';
 
 // ignore_for_file: constant_identifier_names
-enum PassCategory { PILGRIM, STAFF, VEHICLE, VISITOR, VIP }
-enum TripType { HAJJ, UMRAH }
+enum PassCategory { ATTENDEE, VIP, STAFF, SPEAKER, MEDIA, VENDOR }
+enum TripType { SINGLE_DAY, MULTI_DAY, VIP_ACCESS, BACKSTAGE, EXHIBITOR }
 
 class GatePass {
   final String passId;
@@ -91,22 +91,22 @@ class GatePass {
 
   factory GatePass.fromJson(Map<String, dynamic> json) {
     String norm(String? s) => (s ?? '').toString().toUpperCase();
-    final catStr = norm(json['category'] ?? json['cat'] ?? 'PILGRIM');
+    final catStr = norm(json['category'] ?? json['cat'] ?? 'ATTENDEE');
     final tripStr = norm(json['trip_type'] ?? json['tripType']);
     return GatePass(
       passId: json['pass_id'] ?? json['pid'] ?? 'UNKNOWN',
       category: PassCategory.values.firstWhere(
           (e) => e.name.toUpperCase() == catStr,
-          orElse: () => PassCategory.PILGRIM),
+          orElse: () => PassCategory.ATTENDEE),
       fullName: json['full_name'] ?? json['nm'] ?? '',
       idNumber: json['id_number'] ?? json['idn'] ?? '',
       phone: json['phone'],
       operator: json['operator'] ?? json['op'] ?? 'Unknown Operator',
       tripType: tripStr.isNotEmpty
-          ? TripType.values.firstWhere((e) => e.name.toUpperCase() == tripStr, orElse: () => TripType.HAJJ)
+          ? TripType.values.firstWhere((e) => e.name.toUpperCase() == tripStr, orElse: () => TripType.SINGLE_DAY)
           : null,
       validFrom: DateTime.tryParse(json['valid_from'] ?? '') ?? DateTime.now(),
-      validTo: DateTime.tryParse(json['valid_to'] ?? '') ?? DateTime.now().add(const Duration(days: 30)),
+      validTo: DateTime.tryParse(json['valid_to'] ?? '') ?? DateTime.now().add(const Duration(days: 3)),
       gate: json['gate'] ?? json['gt'],
       groupRef: json['group_ref'] ?? json['grp'],
       vehiclePlate: json['vehicle_plate'] ?? json['vp'],

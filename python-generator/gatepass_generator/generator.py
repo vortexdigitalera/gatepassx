@@ -85,12 +85,12 @@ def create_pass_pdf(
 
     c.setFillColor(white)
     c.setFont("Helvetica-Bold", 22)
-    c.drawCentredString(width/2, height - 18*mm, "AHUON")
+    c.drawCentredString(width/2, height - 18*mm, "GATEPASSX")
     c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(width/2, height - 27*mm, "GATE PASS — HAJJ & UMRAH OPERATORS OF NIGERIA")
+    c.drawCentredString(width/2, height - 27*mm, "EVENT ENTRY GATE PASS")
 
     c.setFont("Helvetica", 9)
-    c.drawCentredString(width/2, height - 35*mm, "Official Digital Pass • Verify via QR at gate")
+    c.drawCentredString(width/2, height - 35*mm, "Official Event Pass • Verify via QR at gate")
 
     # Pass ID (large)
     c.setFillColor(black)
@@ -160,7 +160,7 @@ def create_pass_pdf(
     # Footer
     c.setFont("Helvetica", 8)
     c.drawString(margin, 18*mm, f"Issued: {gate_pass.issued_at.strftime('%Y-%m-%d %H:%M UTC')} by {gate_pass.issued_by}")
-    c.drawRightString(width - margin, 18*mm, "AHUON GatePassX • Secure Movement")
+    c.drawRightString(width - margin, 18*mm, "GatePassX • Secure Event Entry")
 
     # Signature / stamp area
     c.setStrokeColor(HexColor("#888888"))
@@ -211,7 +211,7 @@ def create_passes_sheet(
     c.rect(0, height-25*mm, width, 25*mm, fill=1, stroke=0)
     c.setFillColor(white)
     c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(width/2, height - 15*mm, "AHUON — Gate Pass Batch Sheet")
+    c.drawCentredString(width/2, height - 15*mm, "GATEPASSX — Event Pass Batch Sheet")
 
     c.setFillColor(black)
     c.setFont("Helvetica", 10)
