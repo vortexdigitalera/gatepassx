@@ -9,8 +9,14 @@ import '../models/gate_pass.dart';
 class ScannerScreen extends StatefulWidget {
   final Future<void> Function(PassLog) onAddLog;
   final List<GatePass> knownPasses;
+  final VoidCallback onBack;
 
-  const ScannerScreen({super.key, required this.onAddLog, required this.knownPasses});
+  const ScannerScreen({
+    super.key,
+    required this.onAddLog,
+    required this.knownPasses,
+    required this.onBack,
+  });
 
   @override
   State<ScannerScreen> createState() => _ScannerScreenState();
@@ -81,7 +87,10 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     final pid = data?['pid'] ?? data?['pass_id'] ?? payload;
     GatePass? match;
     for (final p in widget.knownPasses) {
-      if (p.passId == pid) { match = p; break; }
+      if (p.passId == pid) {
+        match = p;
+        break;
+      }
     }
 
     final now = DateTime.now();
@@ -104,7 +113,6 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       notes: reason,
     );
     widget.onAddLog(log);
-
     _playFeedback(valid);
 
     if (mounted) _showResult(valid, reason, match, pid);
@@ -117,7 +125,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
       backgroundColor: Colors.transparent,
       transitionAnimationController: AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 350),
+        duration: const Duration(milliseconds: 400),
       ),
       builder: (ctx) => _ResultSheet(
         valid: valid,
@@ -149,109 +157,146 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final w = constraints.maxWidth;
-        final h = constraints.maxHeight;
-        final scanSize = w * 0.68;
-        final left = (w - scanSize) / 2;
-        final top = h * 0.22;
-        _scanRect = Rect.fromLTWH(left, top, scanSize, scanSize);
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        widget.onBack();
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final w = constraints.maxWidth;
+          final h = constraints.maxHeight;
+          final scanSize = w * 0.68;
+          final left = (w - scanSize) / 2;
+          final top = h * 0.22;
+          _scanRect = Rect.fromLTWH(left, top, scanSize, scanSize);
 
-        return Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
-            children: [
-              // Full camera feed
-              MobileScanner(
-                controller: _controller,
-                onDetect: _onDetect,
-                fit: BoxFit.cover,
-                scanWindow: _scanRect,
-                overlayBuilder: (ctx, cons) => _buildOverlay(cons, cs),
-                placeholderBuilder: (_) => const ColoredBox(
-                  color: Colors.black,
-                  child: Center(child: CircularProgressIndicator(color: Colors.white)),
+          return Scaffold(
+            backgroundColor: Colors.black,
+            body: Stack(
+              children: [
+                MobileScanner(
+                  controller: _controller,
+                  onDetect: _onDetect,
+                  fit: BoxFit.cover,
+                  scanWindow: _scanRect,
+                  overlayBuilder: (ctx, cons) => _buildOverlay(cons, cs),
+                  placeholderBuilder: (_) => const ColoredBox(
+                    color: Colors.black,
+                    child: Center(child: CircularProgressIndicator(color: Colors.white)),
+                  ),
                 ),
-              ),
 
-              // Top safe area — header
-              Positioned(
-                top: 0, left: 0, right: 0,
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      children: [
-                        // Back hint
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.45),
-                            borderRadius: BorderRadius.circular(20),
+                // Top header with back button
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        children: [
+                          // Back button
+                          _buildGlassButton(
+                            onTap: widget.onBack,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                                const SizedBox(width: 6),
+                                Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 18),
+                                const SizedBox(width: 6),
+                                const Text('SCANNER', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                              ],
+                            ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 18),
-                              const SizedBox(width: 6),
-                              const Text('SCANNER', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1)),
-                            ],
+                          const Spacer(),
+                          // Torch toggle
+                          ValueListenableBuilder<MobileScannerState>(
+                            valueListenable: _controller,
+                            builder: (ctx, state, _) {
+                              if (!state.isInitialized) return const SizedBox();
+                              return IconButton(
+                                onPressed: () {
+                                  setState(() => _torchOn = !_torchOn);
+                                  _controller.toggleTorch();
+                                },
+                                icon: Icon(
+                                  _torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                                  color: _torchOn ? Colors.amber : Colors.white70,
+                                  size: 24,
+                                ),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.black.withValues(alpha: 0.45),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  padding: const EdgeInsets.all(10),
+                                ),
+                              );
+                            },
                           ),
-                        ),
-                        const Spacer(),
-                        // Torch toggle
-                        ValueListenableBuilder<MobileScannerState>(
-                          valueListenable: _controller,
-                          builder: (ctx, state, _) {
-                            if (!state.isInitialized) return const SizedBox();
-                            return IconButton(
-                              onPressed: () {
-                                setState(() => _torchOn = !_torchOn);
-                                _controller.toggleTorch();
-                              },
-                              icon: Icon(
-                                _torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                                color: _torchOn ? cs.tertiary : Colors.white70,
-                              ),
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.black.withValues(alpha: 0.45),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              // Instruction text below scan frame
-              Positioned(
-                left: 0, right: 0,
-                top: top + scanSize + 20,
-                child: Center(
-                  child: Text(
-                    'Point camera at QR code',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                // Instruction text
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: top + scanSize + 24,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Point camera at QR code',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                    ),
                   ),
                 ),
-              ),
 
-              // Paste field at bottom
-              Positioned(
-                left: 16, right: 16,
-                bottom: MediaQuery.of(context).padding.bottom + 12,
-                child: _buildPasteField(cs),
-              ),
+                // Paste field at bottom
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: MediaQuery.of(context).padding.bottom + 16,
+                  child: _buildPasteField(cs),
+                ),
 
-              // Processing overlay
-              if (_processing)
-                Container(color: Colors.black.withValues(alpha: 0.5)),
-            ],
+                // Processing overlay
+                if (_processing)
+                  Container(color: Colors.black.withValues(alpha: 0.5)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildGlassButton({required VoidCallback onTap, required Widget child}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           ),
-        );
-      },
+          child: child,
+        ),
+      ),
     );
   }
 
@@ -259,12 +304,10 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     final rect = _scanRect!;
     return Stack(
       children: [
-        // Darkened overlay with cutout
         CustomPaint(
           size: cons.biggest,
           painter: _OverlayPainter(rect, cs),
         ),
-        // Animated scan line
         AnimatedBuilder(
           animation: _scanLineAnim,
           builder: (ctx, _) => Positioned(
@@ -295,35 +338,37 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
     return Container(
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Row(
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Icon(Icons.paste_rounded, color: Colors.white38, size: 18),
+            padding: const EdgeInsets.only(left: 14),
+            child: Icon(Icons.paste_rounded, color: Colors.white38, size: 20),
           ),
           Expanded(
             child: TextField(
               controller: _pasteCtrl,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              decoration: InputDecoration(
+              style: const TextStyle(color: Colors.white, fontSize: 15),
+              decoration: const InputDecoration(
                 hintText: 'Paste QR / Pass ID',
-                hintStyle: const TextStyle(color: Colors.white24),
+                hintStyle: TextStyle(color: Colors.white24),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               ),
               onSubmitted: _manualSubmit,
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(right: 4),
+            padding: const EdgeInsets.only(right: 6),
             child: IconButton(
-              icon: Icon(Icons.send_rounded, color: cs.tertiary, size: 20),
+              icon: Icon(Icons.send_rounded, color: cs.tertiary, size: 22),
               onPressed: () => _manualSubmit(_pasteCtrl.text),
               style: IconButton.styleFrom(
                 backgroundColor: Colors.white.withValues(alpha: 0.1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.all(10),
               ),
             ),
           ),
@@ -335,7 +380,7 @@ class _ScannerScreenState extends State<ScannerScreen> with TickerProviderStateM
 
 // ── Result Bottom Sheet ──────────────────────────────────────────────────────
 
-class _ResultSheet extends StatelessWidget {
+class _ResultSheet extends StatefulWidget {
   final bool valid;
   final String reason;
   final GatePass? match;
@@ -353,9 +398,32 @@ class _ResultSheet extends StatelessWidget {
   });
 
   @override
+  State<_ResultSheet> createState() => _ResultSheetState();
+}
+
+class _ResultSheetState extends State<_ResultSheet> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseCtrl;
+  late final Animation<double> _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final statusColor = valid ? Colors.green : Colors.red;
+    final statusColor = widget.valid ? Colors.green : Colors.red;
 
     return Container(
       width: double.infinity,
@@ -368,66 +436,85 @@ class _ResultSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag handle
-            Container(
-              margin: const EdgeInsets.only(top: 10),
-              width: 36, height: 4,
-              decoration: BoxDecoration(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Status icon
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 450),
-              curve: Curves.elasticOut,
-              builder: (ctx, val, _) => Transform.scale(
-                scale: val,
-                child: Icon(
-                  valid ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                  color: statusColor,
-                  size: 72,
-                ),
-              ),
-            ),
             const SizedBox(height: 8),
+
+            // Animated status icon with pulse
+            AnimatedBuilder(
+              animation: _pulseAnim,
+              builder: (ctx, _) => TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.elasticOut,
+                builder: (ctx, scaleVal, child) {
+                  return Transform.scale(
+                    scale: scaleVal * _pulseAnim.value,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: statusColor.withValues(alpha: 0.15), width: 2),
+                      ),
+                      child: Icon(
+                        widget.valid ? Icons.verified_rounded : Icons.cancel_rounded,
+                        color: statusColor,
+                        size: 56,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
 
             // Status text
             Text(
-              valid ? 'ACCESS GRANTED' : 'ACCESS DENIED',
+              widget.valid ? 'ACCESS GRANTED' : 'ACCESS DENIED',
               style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
                 color: statusColor,
-                letterSpacing: 0.5,
+                letterSpacing: 0.8,
               ),
             ),
-            if (reason != 'OK') ...[
-              const SizedBox(height: 4),
-              Text(reason, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+            if (widget.reason != 'OK') ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(widget.reason, style: TextStyle(fontSize: 13, color: statusColor, fontWeight: FontWeight.w500)),
+              ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
 
             // Pass details
-            if (match != null)
+            if (widget.match != null)
               _buildMatchDetails(context, cs)
             else
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: cs.onSurfaceVariant),
-                    const SizedBox(width: 6),
-                    Text('Pass ID: $pid', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-                  ],
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 18, color: cs.onSurfaceVariant),
+                      const SizedBox(width: 8),
+                      Flexible(child: Text('Pass ID: ${widget.pid}', style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant, fontFamily: 'monospace'))),
+                    ],
+                  ),
                 ),
               ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // Action buttons
             Padding(
@@ -436,11 +523,7 @@ class _ResultSheet extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: onClose,
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
+                      onPressed: widget.onClose,
                       child: const Text('CLOSE'),
                     ),
                   ),
@@ -448,13 +531,9 @@ class _ResultSheet extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: FilledButton.icon(
-                      onPressed: onScanAgain,
-                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                      onPressed: widget.onScanAgain,
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 22),
                       label: const Text('SCAN AGAIN'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
                     ),
                   ),
                 ],
@@ -467,57 +546,64 @@ class _ResultSheet extends StatelessWidget {
   }
 
   Widget _buildMatchDetails(BuildContext context, ColorScheme cs) {
-    final m = match!;
-    final statusColor = valid ? Colors.green : Colors.red;
+    final m = widget.match!;
+    final statusColor = widget.valid ? Colors.green : Colors.red;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         children: [
-          // Name row
           Row(
             children: [
-              CircleAvatar(
-                backgroundColor: statusColor.withValues(alpha: 0.1),
-                child: Icon(Icons.person_rounded, color: statusColor, size: 20),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.person_rounded, color: statusColor, size: 24),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(m.fullName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                    Text(m.passId, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                    Text(m.fullName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                    Text(m.passId, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, fontFamily: 'monospace')),
                   ],
                 ),
               ),
-              Chip(
-                label: Text(m.category.name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(m.category.name, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: cs.onPrimaryContainer)),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Divider(height: 1, color: cs.outlineVariant),
-          const SizedBox(height: 8),
-          _infoRow(Icons.event_outlined, 'Event', m.eventName, cs),
-          _infoRow(Icons.assignment_ind_outlined, 'ID', m.idNumber, cs),
+          const SizedBox(height: 10),
+          _infoRow(Icons.event_rounded, 'Event', m.eventName, cs),
+          _infoRow(Icons.assignment_ind_rounded, 'ID', m.idNumber, cs),
           if (m.phone != null && m.phone!.isNotEmpty)
-            _infoRow(Icons.phone_outlined, 'Phone', m.phone!, cs),
-          _infoRow(Icons.business_outlined, 'Organizer', m.organizer, cs),
+            _infoRow(Icons.phone_rounded, 'Phone', m.phone!, cs),
+          _infoRow(Icons.business_rounded, 'Organizer', m.organizer, cs),
           if (m.gate != null && m.gate!.isNotEmpty)
-            _infoRow(Icons.location_on_outlined, 'Gate', m.gate!, cs),
+            _infoRow(Icons.location_on_rounded, 'Gate', m.gate!, cs),
           if (m.tableNumber != null && m.tableNumber!.isNotEmpty)
-            _infoRow(Icons.table_restaurant_outlined, 'Table', m.tableNumber!, cs),
-          _infoRow(Icons.date_range_outlined, 'Valid',
+            _infoRow(Icons.table_restaurant_rounded, 'Table', m.tableNumber!, cs),
+          _infoRow(Icons.date_range_rounded, 'Valid',
               '${DateFormat('dd MMM yyyy').format(m.validFrom)} — ${DateFormat('dd MMM yyyy').format(m.validTo)}', cs),
-          _infoRow(Icons.category_outlined, 'Type', m.eventType.name, cs),
+          _infoRow(Icons.category_rounded, 'Type', m.eventType.name, cs),
         ],
       ),
     );
@@ -525,16 +611,23 @@ class _ResultSheet extends StatelessWidget {
 
   Widget _infoRow(IconData icon, String label, String value, ColorScheme cs) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: cs.onSurfaceVariant),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 68,
-            child: Text(label, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(icon, size: 16, color: cs.onSurfaceVariant),
           ),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 72,
+            child: Text(label, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500)),
+          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
         ],
       ),
     );
@@ -556,20 +649,19 @@ class _OverlayPainter extends CustomPainter {
       Path.combine(
         PathOperation.difference,
         Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)),
-        Path()..addRRect(RRect.fromRectAndRadius(scanRect, const Radius.circular(20))),
+        Path()..addRRect(RRect.fromRectAndRadius(scanRect, const Radius.circular(24))),
       ),
       bg,
     );
 
-    // Corner brackets
     final paint = Paint()
       ..color = cs.primary
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
+      ..strokeWidth = 4
       ..strokeCap = StrokeCap.round;
 
-    final r = 14.0;
-    final len = 28.0;
+    final r = 16.0;
+    final len = 32.0;
     final l = scanRect.left, t = scanRect.top, ri = scanRect.right, b = scanRect.bottom;
 
     canvas.drawLine(Offset(l + r, t), Offset(l + r + len, t), paint);
