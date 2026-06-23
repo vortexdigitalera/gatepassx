@@ -198,7 +198,9 @@ jobs:
           echo "Building APK versionName=$VERSION_NAME buildNumber=$BUILD_NUMBER"
           echo "Keystore: ${ANDROID_KEYSTORE_PATH:-<none — will use debug>}"
 
-          rm -rf $GRADLE_USER_HOME/caches/jars-* || true
+          # Aggressive clean for jar cache corruption (bcprov etc) seen in mobile_scanner + Gradle
+          rm -rf "$GRADLE_USER_HOME/caches/jars-"* 2>/dev/null || true
+          rm -rf "$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle" 2>/dev/null || true
 
           flutter build apk --release \
             --build-name "$VERSION_NAME" \
