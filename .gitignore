@@ -32,3 +32,4 @@ mobile/android/key.properties
 *.jks
 *.keystore
 mobile/android/upload-keystore.jks
+python-generator/outputdir/gatepassx_release.zip

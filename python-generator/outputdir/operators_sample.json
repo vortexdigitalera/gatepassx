@@ -1,0 +1,19 @@
+{
+  "passes": [
+    {
+      "pass_id": "GPX-OPERATOR-2026-0001",
+      "event_name": "AHUON Post Hajj Dinner 2026",
+      "event_type": "DINNER",
+      "category": "MEMBER",
+      "full_name": "A.A.U CHAMO INTL BUSINESS AGEMCY SERVICES LTD",
+      "id_number": "AHUON-OP-001",
+      "organizer": "AHUON",
+      "valid_from": "2026-06-28",
+      "valid_to": "2026-06-28",
+      "gate": "Main Entrance",
+      "table_number": "T-1",
+      "group_ref": "AHUON-OPS-2026",
+      "issued_by": "GatePassX CLI"
+    }
+  ]
+}

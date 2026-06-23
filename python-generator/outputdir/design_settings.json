@@ -1,0 +1,30 @@
+{
+  "description": "Design settings for AHUON Post Hajj Dinner 2026 gate passes",
+  "event": {
+    "name": "AHUON Post Hajj Dinner 2026",
+    "date": "28 June 2026",
+    "organization": "Association for Hajj & Umrah Operators of Nigeria (AHUON)",
+    "zone": "KANO ZONE",
+    "category": "MEMBER"
+  },
+  "design": {
+    "qr_size_mm": 130,
+    "qr_alignment": "center",
+    "qr_transparent_bg": true,
+    "qr_border": 0,
+    "font_family": "BricolageGrotesque",
+    "template_path": "template.pdf",
+    "overlay_texts": [
+      {"text": "28 June 2026", "size": 11, "bold": false},
+      {"text": "AHUON Post Hajj Dinner", "size": 9, "bold": false}
+    ]
+  },
+  "layout": {
+    "description": "Large QR dominates the pass, travel agency name as header below, compact metadata body underneath",
+    "name_size": 36,
+    "metadata_label_size": 14,
+    "metadata_value_size": 16,
+    "category_badge_size": 16
+  },
+  "cli_command": "python3 -m app generate -i operators_sample.csv -o ./passes --template template.pdf --qr-size 130 --qr-align center --qr-border 0 --qr-transparent --overlay-text \"28 June 2026\" --overlay-text \"AHUON Post Hajj Dinner\" --text-size 11 --text-size 9"
+}
