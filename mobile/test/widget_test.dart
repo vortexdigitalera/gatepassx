@@ -16,8 +16,8 @@ void main() {
     await tester.pumpWidget(const GatePassXApp());
     // Verify title text appears
     expect(find.textContaining('GatePassX'), findsOneWidget);
-    // Dashboard tab label
-    expect(find.text('Dashboard'), findsOneWidget);
+    // Home tab label
+    expect(find.text('Home'), findsOneWidget);
   });
 
   group('GatePass model + workflow', () {
