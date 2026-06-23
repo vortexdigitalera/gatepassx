@@ -1,0 +1,100 @@
+name: Build iOS (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Build version (e.g. 2026.07.22)'
+        required: false
+        default: '2026.07.22'
+      codesign:
+        description: 'Attempt code signing (requires Apple secrets)'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: ios-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.29.0'
+
+jobs:
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+          pub-cache: true
+
+      - name: Flutter pub get
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Build iOS (${{ github.event.inputs.codesign == 'true' && 'release' || 'debug' }})
+        working-directory: mobile
+        env:
+          VERSION_NAME: ${{ github.event.inputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event.inputs.codesign }}" == "true" ]]; then
+            flutter build ios --release --no-codesign \
+              --build-name "$VERSION_NAME" \
+              --build-number "$BUILD_NUMBER"
+          else
+            flutter build ios --debug --no-codesign \
+              --build-name "$VERSION_NAME" \
+              --build-number "$BUILD_NUMBER"
+          fi
+
+          echo "Build complete. Listing output:"
+          ls -lh build/ios/iphoneos/ || true
+
+      - name: Export IPA (if Xcode build succeeds)
+        if: github.event.inputs.codesign == 'true'
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p export
+          xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportPath export \
+            -exportOptionsPlist <(echo '{"method":"app-store","teamID":"","signingStyle":"automatic"}')
+          ls -lh export/
+
+      - name: Stage artifacts
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -d "mobile/build/ios/iphoneos" ]; then
+            # .app bundle
+            tar czf "gatepassx-ios-${VERSION}.tar.gz" \
+              -C mobile/build/ios/iphoneos Runner.app
+            ls -lh "gatepassx-ios-${VERSION}.tar.gz"
+          fi
+          if [ -f "export/Runner.ipa" ]; then
+            cp "export/Runner.ipa" "gatepassx-ios-${VERSION}.ipa"
+            ls -lh "gatepassx-ios-${VERSION}.ipa"
+          fi
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-${{ github.event.inputs.version }}
+          path: gatepassx-ios-*
+          if-no-files-found: error
+          retention-days: 7
